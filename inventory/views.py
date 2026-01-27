@@ -256,21 +256,42 @@ def po_detail_view(request, po_id):
                          return redirect('po_detail', po_id=po.id)
                      po.po_number = new_po_number
 
-                     po.po_number = new_po_number
-
                 order_date_str = request.POST.get('order_date')
                 if order_date_str:
                     po.order_date = order_date_str
+                
+                est_date_str = request.POST.get('estimated_date')
+                if est_date_str:
+                    po.estimated_date = est_date_str
+                else:
+                    po.estimated_date = None
 
                 po.order_type = request.POST.get('order_type')
                 po.shipping_type = request.POST.get('shipping_type')
-                po.shipping_cost_baht = float(request.POST.get('shipping_cost_baht', 0))
+                
+                po.exchange_rate = float(request.POST.get('exchange_rate', 1.0) or 1.0)
+                po.shipping_cost_baht = float(request.POST.get('shipping_cost_baht', 0) or 0)
+                po.shipping_rate_kg = float(request.POST.get('shipping_rate_kg', 0) or 0)
+                po.shipping_rate_cbm = float(request.POST.get('shipping_rate_cbm', 0) or 0)
+                
+                # Prices
+                po.shopee_price = float(request.POST.get('shopee_price', 0) or 0) if request.POST.get('shopee_price') else None
+                po.lazada_price = float(request.POST.get('lazada_price', 0) or 0) if request.POST.get('lazada_price') else None
+                po.tiktok_price = float(request.POST.get('tiktok_price', 0) or 0) if request.POST.get('tiktok_price') else None
+
                 po.note = request.POST.get('note', '')
                 po.link_shop = request.POST.get('link_shop', '')
                 po.wechat_contact = request.POST.get('wechat_contact', '')
                 po.tracking_no = request.POST.get('tracking_no', '')
                 
                 po.save()
+                
+                # Handle Files
+                files = request.FILES.getlist('attachments')
+                for f in files:
+                    from .models import POAttachment
+                    POAttachment.objects.create(header=po, file=f)
+                
                 messages.success(request, "✅ บันทึกข้อมูล PO เรียบร้อย")
             except Exception as e:
                 messages.error(request, f"Error: {e}")

@@ -16,6 +16,11 @@ class MasterItem(models.Model):
     
     note = models.TextField(blank=True, null=True, verbose_name="Note")
     
+    # Selling Price Benchmarks
+    shopee_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="ราคาขาย Shopee")
+    lazada_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="ราคาขาย Lazada")
+    tiktok_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="ราคาขาย TikTok")
+    
     # Financials (implied from sales/po, but good to have master price if needed, though not explicitly in Master Design)
 
     def __str__(self):
@@ -46,6 +51,8 @@ class POHeader(models.Model):
     exchange_rate = models.DecimalField(max_digits=10, decimal_places=4, default=1.0, verbose_name="เรทเงิน")
     total_yuan = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="ยอดหยวน (¥)")
     shipping_cost_baht = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="ต้นทุน/ชิ้น (฿)") # This name is ambiguous in design, might be header level cost? "shipping_cost_baht"
+    shipping_rate_kg = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="ค่าส่ง/กก.")
+    shipping_rate_cbm = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="ค่าส่ง/CBM")
     
     # Extra fields from user design
     link_shop = models.CharField(max_length=255, blank=True, null=True, verbose_name="ลิงค์ร้านค้า")
@@ -115,6 +122,37 @@ class POItem(models.Model):
     def remaining_qty(self):
         return max(0, self.qty_ordered - self.total_received_qty)
 
+    @property
+    def unit_price_yuan(self):
+        if self.qty_ordered and self.qty_ordered > 0:
+            return self.price_yuan / self.qty_ordered
+        return 0
+
+    @property
+    def total_shipping_cost(self):
+        # Calculate calculated shipping cost based on Header Rates and Item Dim/Weight
+        cost_kg = (self.weight or 0) * (self.header.shipping_rate_kg or 0)
+        cost_cbm = (self.cbm or 0) * (self.header.shipping_rate_cbm or 0)
+        # Assuming additive? Or max? Usually shipping is one or the other based on type.
+        # But user requested both columns. Let's sum them if both exist (rare) or user sets one.
+        return cost_kg + cost_cbm
+
+    @property
+    def unit_cost_baht(self):
+        # (Total Baht + Total Shipping) / Qty
+        total_b = (self.price_baht or 0) + self.total_shipping_cost
+        if self.qty_ordered and self.qty_ordered > 0:
+            return total_b / self.qty_ordered
+        return 0
+        
+    @property
+    def duration_days(self):
+        # Days from Order to Today (if pending) or Order to Received (if complete?)
+        # Simple logic: Order to Today
+        if self.header.order_date:
+            return (date.today() - self.header.order_date).days
+        return 0
+
     def __str__(self):
         return f"{self.sku.product_code} in {self.header.po_number}"
 
@@ -171,6 +209,11 @@ class POAttachment(models.Model):
     header = models.ForeignKey(POHeader, on_delete=models.CASCADE, related_name='attachments')
     file = models.FileField(upload_to='po_attachments/')
     uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def filename(self):
+        import os
+        return os.path.basename(self.file.name)
 
     def __str__(self):
         return f"File for {self.header.po_number}"

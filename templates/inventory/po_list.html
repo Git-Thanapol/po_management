@@ -10,7 +10,7 @@ JST System{% endblock %} {% block content %}
         <i class="bi bi-search"></i> ตัวกรองและค้นหา
       </h5>
       <form method="get" class="row g-3">
-        <div class="col-md-3">
+        <div class="col-md-2">
           <label class="form-label">เลข PO</label>
           <input
             type="text"
@@ -20,7 +20,7 @@ JST System{% endblock %} {% block content %}
             placeholder="ระบุเลข PO..."
           />
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
           <label class="form-label">SKU / ชื่อสินค้า</label>
           <input
             type="text"
@@ -82,14 +82,14 @@ JST System{% endblock %} {% block content %}
             {% endif %} {% endfor %}
           </select>
         </div>
-        <div class="col-md-2 d-flex align-items-end">
+        <div class="col-md-1 d-flex align-items-end">
           <button type="submit" class="btn btn-primary w-100">ค้นหา</button>
         </div>
       </form>
     </div>
 
     <!-- Actions -->
-    <div class="d-flex justify-content-end mb-3 gap-2">
+    <div class="d-flex justify-content-start mb-3 gap-2">
       <a href="{% url 'po_create' %}" class="btn btn-success">
         <i class="bi bi-plus-lg"></i> สร้าง PO ใหม่ (Create PO)
       </a>
@@ -103,56 +103,96 @@ JST System{% endblock %} {% block content %}
             class="table table-hover table-striped align-middle mb-0"
             style="font-size: 0.9rem"
           >
-            <thead class="table-dark text-nowrap">
+            <thead class="text-nowrap text-center text-white">
               <tr>
-                <th>Actions</th>
-                <th>รหัสสินค้า</th>
-                <th>รูป</th>
-                <th>สถานะ (PO)</th>
-                <th>เลข PO</th>
-                <th>ขนส่ง</th>
-                <th>วันที่สั่งซื้อ</th>
-                <th>วันคาดการณ์</th>
-                <th>รับแล้ว/สั่งซื้อ</th>
-                <th class="text-end">ต้นทุน (¥)</th>
-                <th class="text-end">ยอดบาท (฿)</th>
+                <th class="bg-dark">แก้ไข</th>
+                <th class="bg-primary">รหัสสินค้า</th>
+                <th class="bg-dark">รูป</th>
+                <th class="bg-dark">สถานะ</th>
+                <th class="bg-dark">เลข PO</th>
+                <th class="bg-dark">ขนส่ง</th>
+
+                <!-- Dates - Purple -->
+                <th style="background-color: #6f42c1">วันที่สั่งซื้อ</th>
+                <th style="background-color: #6f42c1">วันคาดการณ์</th>
+                <th style="background-color: #6f42c1">วันที่ได้รับ</th>
+                <th style="background-color: #6f42c1">ระยะเวลา</th>
+
+                <!-- Received - Purple/Dark -->
+                <th style="background-color: #6f42c1">รับแล้ว</th>
+
+                <!-- Ordered/Cost - Green -->
+                <th style="background-color: #198754">สั่งซื้อ</th>
+                <th style="background-color: #198754">ต้นทุน/ชิ้น (฿)</th>
+
+                <th class="bg-dark">ยอดหยวน (¥)</th>
+                <th class="bg-dark">ยอดบาทรวม (฿)</th>
+                <th class="bg-dark">เรทเงิน</th>
+                <th class="bg-dark">เรทขนส่ง</th>
+                <th class="bg-dark">คิว (CBM)</th>
+                <th class="bg-dark">ค่าส่งรวม</th>
+                <th class="bg-dark">น้ำหนัก (KG)</th>
+                <th class="bg-dark">ราคา/ชิ้น (¥)</th>
+
+                <!-- Platforms -->
+                <th style="background-color: #fd7e14">SHOPEE</th>
+                <th style="background-color: #0d6efd">LAZADA</th>
+                <th class="bg-black">TIKTOK</th>
+
+                <th class="bg-dark">หมายเหตุ</th>
+                <th class="bg-dark">attachfile</th>
               </tr>
             </thead>
             <tbody>
               {% for item in po_items %}
               <tr>
-                <td>
-                  <!-- Edit Button: Navigates to Full PO Detail -->
+                <!-- Edit -->
+                <td class="text-center">
+                  <!-- Link to PO Detail or Edit -->
                   <a
                     href="{% url 'po_detail' item.header.id %}"
-                    class="btn btn-sm btn-outline-primary mb-1"
+                    class="btn btn-sm btn-outline-warning border-0 p-0 text-warning"
+                    title="Edit"
                   >
-                    <i class="bi bi-pencil-square"></i> แก้ไข/Detail
+                    <i class="bi bi-pencil-square"></i>
                   </a>
                 </td>
-                <td class="fw-bold">
-                  {{ item.sku.product_code }}<br /><small class="text-muted"
-                    >{{ item.sku.name|truncatechars:20 }}</small
-                  >
+
+                <!-- SKU -->
+                <td class="fw-bold text-primary">
+                  {{ item.sku.product_code }}
                 </td>
-                <td>
+
+                <!-- Image -->
+                <td class="text-center">
                   {% if item.sku.image %}
                   <img
                     src="{{ item.sku.image.url }}"
-                    style="height: 35px; width: 35px; object-fit: cover"
                     class="rounded"
+                    style="height: 35px; width: 35px; object-fit: cover"
                   />
-                  {% else %} - {% endif %}
-                </td>
-                <td>
-                  {% if item.header.status == 'Pending' %}
-                  <span class="badge bg-warning text-dark">รอจัดส่ง</span>
                   {% else %}
-                  <span class="badge bg-success">เรียบร้อย</span>
+                  <span class="text-muted small">-</span>
                   {% endif %}
                 </td>
+
+                <!-- Status -->
+                <td class="text-center">
+                  {% if item.header.status == 'Pending' %}
+                  <span class="badge rounded-pill bg-warning text-dark"
+                    >รอส่ง</span
+                  >
+                  {% elif item.header.status == 'Complete' %}
+                  <span class="badge rounded-pill bg-success">เรียบร้อย</span>
+                  {% else %}
+                  <span class="badge rounded-pill bg-secondary"
+                    >{{ item.header.status }}</span
+                  >
+                  {% endif %}
+                </td>
+
+                <!-- PO No -->
                 <td>
-                  <!-- Link Header to Detail -->
                   <a
                     href="{% url 'po_detail' item.header.id %}"
                     class="text-info text-decoration-none"
@@ -160,24 +200,109 @@ JST System{% endblock %} {% block content %}
                     {{ item.header.po_number }}
                   </a>
                 </td>
-                <td>{{ item.header.shipping_type }}</td>
-                <td>{{ item.header.order_date|date:"d/m/Y" }}</td>
-                <td>{{ item.header.estimated_date|date:"d/m/Y" }}</td>
-                <td>
-                  <span
-                    class="fw-bold {% if item.total_received_qty == item.qty_ordered %}text-success{% else %}text-warning{% endif %}"
-                  >
-                    {{ item.total_received_qty }}
-                  </span>
-                  / {{ item.qty_ordered }}
+
+                <!-- Shipping -->
+                <td class="text-center">
+                  {{ item.header.get_shipping_type_display|default:"-" }}
                 </td>
-                <td class="text-end">{{ item.price_yuan|intcomma }}</td>
-                <td class="text-end fw-bold">{{ item.price_baht|intcomma }}</td>
+
+                <!-- Dates -->
+                <td class="text-nowrap">
+                  {{ item.header.order_date|date:"d/m/Y" }}
+                </td>
+                <td class="text-nowrap">
+                  {{ item.header.estimated_date|date:"d/m/Y"|default:"-" }}
+                </td>
+                <td class="text-nowrap">-</td>
+                <!-- Received Date Logic TBD -->
+
+                <!-- Duration -->
+                <td class="text-center">{{ item.duration_days }} วัน</td>
+
+                <!-- Qty -->
+                <td class="text-center fw-bold text-success">
+                  {{ item.total_received_qty }}
+                </td>
+                <td class="text-center fw-bold">{{ item.qty_ordered }}</td>
+
+                <!-- Financials -->
+                <td class="text-end text-primary fw-bold">
+                  {{ item.unit_cost_baht|floatformat:2|intcomma }}
+                </td>
+                <td class="text-end">
+                  {{ item.price_yuan|floatformat:2|intcomma }}
+                </td>
+                <td class="text-end">
+                  {{ item.price_baht|floatformat:2|intcomma }}
+                </td>
+
+                <!-- Rates -->
+                <td class="text-center">
+                  {{ item.header.exchange_rate|floatformat:2 }}
+                </td>
+                <td class="text-center">
+                  {% if item.header.shipping_rate_kg > 0 %} {{
+                  item.header.shipping_rate_kg|floatformat:2 }} (KG) {% elif
+                  item.header.shipping_rate_cbm > 0 %} {{
+                  item.header.shipping_rate_cbm|floatformat:2 }} (CBM) {% else
+                  %} - {% endif %}
+                </td>
+
+                <!-- Shipping Metrics -->
+                <td class="text-end">
+                  {{ item.cbm|floatformat:4|default:"-" }}
+                </td>
+                <td class="text-end">
+                  {{ item.total_shipping_cost|floatformat:2|intcomma }}
+                </td>
+                <td class="text-end">
+                  {{ item.weight|floatformat:2|default:"-" }}
+                </td>
+
+                <!-- Unit Price Yuan -->
+                <td class="text-end">
+                  {{ item.unit_price_yuan|floatformat:2 }}
+                </td>
+
+                <!-- Platforms -->
+                <td class="text-end text-warning">
+                  {{ item.sku.shopee_price|floatformat:2|default:"0.00" }}
+                </td>
+                <td class="text-end text-primary">
+                  {{ item.sku.lazada_price|floatformat:2|default:"0.00" }}
+                </td>
+                <td class="text-end text-dark">
+                  {{ item.sku.tiktok_price|floatformat:2|default:"0.00" }}
+                </td>
+
+                <!-- Note -->
+                <td>
+                  <small
+                    class="d-block text-truncate"
+                    style="max-width: 150px"
+                    title="{{ item.header.note }}"
+                  >
+                    {{ item.header.note|default:"-" }}
+                  </small>
+                </td>
+
+                <!-- Link -->
+                <td class="text-center">
+                  {% if item.header.link_shop %}
+                  <a
+                    href="{{ item.header.link_shop }}"
+                    target="_blank"
+                    class="text-info"
+                    ><i class="bi bi-link-45deg fs-5"></i
+                  ></a>
+                  {% else %} - {% endif %}
+                </td>
               </tr>
               {% empty %}
               <tr>
-                <td colspan="11" class="text-center py-4 text-muted">
-                  ไม่พบข้อมูลใบสั่งซื้อ
+                <td colspan="26" class="text-center py-5 text-muted">
+                  <i class="bi bi-inbox fs-1 d-block mb-3"></i>
+                  ไม่พบรายการสั่งซื้อ (No PO Found)
                 </td>
               </tr>
               {% endfor %}
