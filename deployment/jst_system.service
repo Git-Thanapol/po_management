@@ -1,0 +1,16 @@
+[Unit]
+Description=gunicorn daemon for jst_system
+After=network.target
+
+[Service]
+User=root
+Group=www-data
+WorkingDirectory=/root/po_management
+ExecStart=/root/po_management/venv/bin/gunicorn \
+          --access-logfile - \
+          --workers 3 \
+          --bind unix:/run/gunicorn.sock \
+          jst_system.wsgi:application
+
+[Install]
+WantedBy=multi-user.target
