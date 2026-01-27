@@ -44,3 +44,6 @@ $RECYCLE.BIN/
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Docker Data
+pgdata/
