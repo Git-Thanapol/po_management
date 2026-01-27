@@ -27,6 +27,12 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*'] # In production, set this to your domain or IP
 
+# CSRF Settings for Production
+CSRF_TRUSTED_ORIGINS = [
+    'http://103.114.201.9:8001',
+    'http://103.114.201.9',
+]
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
