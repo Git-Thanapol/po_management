@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block title %}Login - JST System{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-4">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white text-center">
+                <h4>🔐 เข้าสู่ระบบ (Login)</h4>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email Address</label>
+                        <input type="email" class="form-control" id="email" name="email" required
+                            placeholder="example@swiftpassion.net">
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">ขอรหัส OTP</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

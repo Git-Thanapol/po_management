@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="th" data-bs-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}JST Hybrid System{% endblock %}</title>
+
+    <!-- Bootstrap 5 CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css"
+    />
+
+    <!-- Google Fonts: Sarabun (close to Thaisarabun New) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      body {
+        font-family: "Sarabun", sans-serif;
+        background-color: #121212;
+        color: #e0e0e0;
+      }
+      .navbar {
+        background-color: #1e1e1e !important;
+        border-bottom: 1px solid #333;
+      }
+      .card {
+        background-color: #1e1e1e;
+        border: 1px solid #333;
+      }
+      .table {
+        --bs-table-bg: #1e1e1e;
+        --bs-table-color: #e0e0e0;
+        --bs-table-border-color: #333;
+      }
+    </style>
+    {% block extra_css %}{% endblock %}
+  </head>
+  <body>
+    <div class="d-flex" id="wrapper">
+      <!-- Sidebar -->
+      <div
+        class="bg-dark border-end border-secondary"
+        id="sidebar-wrapper"
+        style="
+          min-width: 250px;
+          max-width: 250px;
+          min-height: 100vh;
+          transition: all 0.3s;
+        "
+      >
+        <div
+          class="sidebar-heading text-white text-center py-4 fs-4 fw-bold border-bottom border-secondary"
+        >
+          📦 JST System
+        </div>
+        <div class="list-group list-group-flush my-3">
+          <a
+            href="{% url 'sales_summary' %}"
+            class="list-group-item list-group-item-action bg-transparent text-white border-0 py-3 {% if request.resolver_match.url_name == 'sales_summary' %}active fw-bold text-warning{% endif %}"
+          >
+            <i class="bi bi-graph-up-arrow me-2"></i> สรุปยอดขาย (Sales)
+          </a>
+          <a
+            href="{% url 'stock_report' %}"
+            class="list-group-item list-group-item-action bg-transparent text-white border-0 py-3 {% if request.resolver_match.url_name == 'stock_report' %}active fw-bold text-info{% endif %}"
+          >
+            <i class="bi bi-box-seam me-2"></i> สต็อก (Stock)
+          </a>
+          <a
+            href="{% url 'po_list' %}"
+            class="list-group-item list-group-item-action bg-transparent text-white border-0 py-3 {% if 'po' in request.resolver_match.url_name %}active fw-bold text-success{% endif %}"
+          >
+            <i class="bi bi-cart3 me-2"></i> รายการสั่งซื้อ (PO)
+          </a>
+          <a
+            href="{% url 'product_list' %}"
+            class="list-group-item list-group-item-action bg-transparent text-white border-0 py-3 {% if request.resolver_match.url_name == 'product_list' %}active fw-bold text-primary{% endif %}"
+          >
+            <i class="bi bi-tags me-2"></i> สินค้า (Products)
+          </a>
+          <a
+            href="{% url 'import_data' %}"
+            class="list-group-item list-group-item-action bg-transparent text-white border-0 py-3 {% if request.resolver_match.url_name == 'import_data' %}active fw-bold text-danger{% endif %}"
+          >
+            <i class="bi bi-cloud-arrow-up me-2"></i> นำเข้าข้อมูล (Imports)
+          </a>
+        </div>
+        <div class="mt-auto p-3 border-top border-secondary">
+          {% if user.is_authenticated %}
+          <div class="d-flex align-items-center text-white small">
+            <div class="flex-shrink-0">
+              <i class="bi bi-person-circle fs-4"></i>
+            </div>
+            <div class="flex-grow-1 ms-2">
+              {{ user.username|truncatechars:15 }}
+            </div>
+            <a
+              href="{% url 'logout' %}"
+              class="btn btn-sm btn-outline-danger ms-2"
+              ><i class="bi bi-box-arrow-right"></i
+            ></a>
+          </div>
+          {% else %}
+          <a href="{% url 'login' %}" class="btn btn-primary w-100">Login</a>
+          {% endif %}
+        </div>
+      </div>
+      <!-- /#sidebar-wrapper -->
+
+      <!-- Page Content -->
+      <div id="page-content-wrapper" class="w-100">
+        <nav
+          class="navbar navbar-expand-lg navbar-dark bg-dark border-bottom border-secondary mb-4"
+        >
+          <div class="container-fluid">
+            <button class="btn btn-outline-secondary" id="sidebarToggle">
+              <i class="bi bi-list fs-5"></i>
+            </button>
+            <!-- Mobile Brand visible only when collapsed? No, keeping clean header -->
+            <span class="navbar-text ms-auto text-white small">
+              {{ now|date:"l, d F Y" }}
+            </span>
+          </div>
+        </nav>
+
+        <div class="container-fluid px-4">
+          {% if messages %} {% for message in messages %}
+          <div
+            class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm"
+            role="alert"
+          >
+            {{ message }}
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="alert"
+              aria-label="Close"
+            ></button>
+          </div>
+          {% endfor %} {% endif %} {% block content %}{% endblock %}
+        </div>
+      </div>
+      <!-- /#page-content-wrapper -->
+    </div>
+    <!-- /#wrapper -->
+
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <!-- Sidebar Toggle Script -->
+    <script>
+      document
+        .getElementById("sidebarToggle")
+        .addEventListener("click", function () {
+          const sidebar = document.getElementById("sidebar-wrapper");
+          if (sidebar.style.marginLeft === "-250px") {
+            sidebar.style.marginLeft = "0";
+          } else {
+            sidebar.style.marginLeft = "-250px";
+          }
+        });
+    </script>
+
+    {% block extra_js %}{% endblock %}
+  </body>
+</html>

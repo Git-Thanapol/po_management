@@ -1,0 +1,167 @@
+{% extends 'base.html' %} {% block title %}Import Data - JST System{% endblock%}
+{% block content %}
+<div class="row mb-4">
+  <div class="col-12">
+    <h2 class="mb-4">📂 จัดการข้อมูล (Data Manager)</h2>
+
+    <div class="row g-4">
+      <!-- Column 1: Master Items -->
+      <div class="col-md-4">
+        <div class="card shadow-sm h-100 border-warning">
+          <div class="card-header bg-warning text-dark fw-bold">
+            <i class="bi bi-box-seam"></i> 1. สินค้าหลัก (Master)
+          </div>
+          <div class="card-body bg-dark text-white">
+            <p class="text-muted small">
+              นำเข้าข้อมูลสินค้าใหม่ หรืออัปเดตรายละเอียดสินค้า (ไฟล์ .xlsx)
+            </p>
+            <hr class="border-secondary" />
+            <form method="post" enctype="multipart/form-data">
+              {% csrf_token %}
+              <input type="hidden" name="type" value="master" />
+              <div class="mb-3">
+                <label class="form-label">เลือกไฟล์ Master Product</label>
+                <input
+                  class="form-control form-control-sm bg-secondary text-white border-secondary"
+                  type="file"
+                  name="file"
+                  accept=".xlsx, .xls"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                class="btn btn-warning w-100 text-dark fw-bold"
+              >
+                <i class="bi bi-cloud-upload"></i> อัปโหลด (Upload)
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Column 2: JST Stock -->
+      <div class="col-md-4">
+        <div class="card shadow-sm h-100 border-info">
+          <div class="card-header bg-info text-dark fw-bold">
+            <i class="bi bi-clipboard-data"></i> 2. สต็อกจริง (JST Stock)
+          </div>
+          <div class="card-body bg-dark text-white">
+            <p class="text-muted small">
+              นำเข้าไฟล์ Snapshot สต็อกรายวันจากระบบ JST Legacy (ไฟล์ .xlsx)
+            </p>
+            <hr class="border-secondary" />
+            <form method="post" enctype="multipart/form-data">
+              {% csrf_token %}
+              <input type="hidden" name="type" value="stock" />
+              <div class="mb-3">
+                <label class="form-label">เลือกไฟล์ Stock Snapshot</label>
+                <input
+                  class="form-control form-control-sm bg-secondary text-white border-secondary"
+                  type="file"
+                  name="file"
+                  accept=".xlsx, .xls"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                class="btn btn-info w-100 text-dark fw-bold"
+              >
+                <i class="bi bi-cloud-upload"></i> อัปโหลด (Upload)
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Column 3: Sales History -->
+      <div class="col-md-4">
+        <div class="card shadow-sm h-100 border-success">
+          <div class="card-header bg-success text-white fw-bold">
+            <i class="bi bi-cart-check"></i> 3. ประวัติการขาย (Sales)
+          </div>
+          <div class="card-body bg-dark text-white">
+            <p class="text-muted small">
+              นำเข้าประวัติการขายรวม (Shopee, Lazada, TikTok, etc.) (ไฟล์ .xlsx)
+            </p>
+            <hr class="border-secondary" />
+            <form method="post" enctype="multipart/form-data">
+              {% csrf_token %}
+              <input type="hidden" name="type" value="sales" />
+              <div class="mb-3">
+                <label class="form-label">เลือกไฟล์ Sales Report</label>
+                <input
+                  class="form-control form-control-sm bg-secondary text-white border-secondary"
+                  type="file"
+                  name="file"
+                  accept=".xlsx, .xls"
+                  required
+                />
+              </div>
+              <button type="submit" class="btn btn-success w-100 fw-bold">
+                <i class="bi bi-cloud-upload"></i> อัปโหลด (Upload)
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if result_log %}
+<div class="row mt-4">
+  <div class="col-12">
+    <div class="alert alert-secondary shadow-sm">
+      <h5 class="alert-heading"><i class="bi bi-terminal"></i> Import Log:</h5>
+      <hr />
+      <ul class="mb-0">
+        {% for err in result_log %}
+        <li>{{ err }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Loading Overlay -->
+<div
+  id="loadingOverlay"
+  style="
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+  "
+>
+  <div class="text-center text-white">
+    <div
+      class="spinner-border text-info"
+      role="status"
+      style="width: 4rem; height: 4rem"
+    >
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <h4 class="mt-3">⏳ กำลังประมวลผล (Processing...)</h4>
+    <p class="text-muted">กรุณารอสักครู่ ห้ามปิดหน้าจอ</p>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll("form").forEach((form) => {
+    form.addEventListener("submit", function () {
+      // Show Spinner
+      document.getElementById("loadingOverlay").style.display = "flex";
+    });
+  });
+</script>
+
+{% endblock %}

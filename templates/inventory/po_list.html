@@ -1,0 +1,192 @@
+{% extends 'base.html' %} {% load humanize %} {% block title %}PO Management -
+JST System{% endblock %} {% block content %}
+<div class="row mb-4">
+  <div class="col-12">
+    <h2 class="mb-3">📋 สรุปรายการสั่งซื้อสินค้า</h2>
+
+    <!-- Filters -->
+    <div class="card p-3 shadow-sm mb-3">
+      <h5 class="card-title text-primary">
+        <i class="bi bi-search"></i> ตัวกรองและค้นหา
+      </h5>
+      <form method="get" class="row g-3">
+        <div class="col-md-3">
+          <label class="form-label">เลข PO</label>
+          <input
+            type="text"
+            name="po_number"
+            class="form-control"
+            value="{{ po_number_query }}"
+            placeholder="ระบุเลข PO..."
+          />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">SKU / ชื่อสินค้า</label>
+          <input
+            type="text"
+            name="search"
+            class="form-control"
+            value="{{ search_query }}"
+            placeholder="ค้นหา..."
+          />
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">สถานะ</label>
+          <select name="status" class="form-select">
+            <option value="">ทั้งหมด</option>
+            <option
+              value="Pending"
+              {%
+              if
+              status_filter=""
+              ="Pending"
+              %}selected{%
+              endif
+              %}
+            >
+              Pending
+            </option>
+            <option
+              value="Complete"
+              {%
+              if
+              status_filter=""
+              ="Complete"
+              %}selected{%
+              endif
+              %}
+            >
+              Complete
+            </option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">หมวดหมู่สินค้า</label>
+          <select name="category" class="form-select">
+            <option value="" {% if not selected_category %}selected{% endif %}>
+              แสดงทั้งหมด
+            </option>
+            {% for cat in categories %} {% if cat %}
+            <option
+              value="{{ cat }}"
+              {%
+              if
+              cat=""
+              ="selected_category"
+              %}selected{%
+              endif
+              %}
+            >
+              {{ cat }}
+            </option>
+            {% endif %} {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+          <button type="submit" class="btn btn-primary w-100">ค้นหา</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Actions -->
+    <div class="d-flex justify-content-end mb-3 gap-2">
+      <a href="{% url 'po_create' %}" class="btn btn-success">
+        <i class="bi bi-plus-lg"></i> สร้าง PO ใหม่ (Create PO)
+      </a>
+    </div>
+
+    <!-- Table -->
+    <div class="card shadow-sm">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table
+            class="table table-hover table-striped align-middle mb-0"
+            style="font-size: 0.9rem"
+          >
+            <thead class="table-dark text-nowrap">
+              <tr>
+                <th>Actions</th>
+                <th>รหัสสินค้า</th>
+                <th>รูป</th>
+                <th>สถานะ (PO)</th>
+                <th>เลข PO</th>
+                <th>ขนส่ง</th>
+                <th>วันที่สั่งซื้อ</th>
+                <th>วันคาดการณ์</th>
+                <th>รับแล้ว/สั่งซื้อ</th>
+                <th class="text-end">ต้นทุน (¥)</th>
+                <th class="text-end">ยอดบาท (฿)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in po_items %}
+              <tr>
+                <td>
+                  <!-- Edit Button: Navigates to Full PO Detail -->
+                  <a
+                    href="{% url 'po_detail' item.header.id %}"
+                    class="btn btn-sm btn-outline-primary mb-1"
+                  >
+                    <i class="bi bi-pencil-square"></i> แก้ไข/Detail
+                  </a>
+                </td>
+                <td class="fw-bold">
+                  {{ item.sku.product_code }}<br /><small class="text-muted"
+                    >{{ item.sku.name|truncatechars:20 }}</small
+                  >
+                </td>
+                <td>
+                  {% if item.sku.image %}
+                  <img
+                    src="{{ item.sku.image.url }}"
+                    style="height: 35px; width: 35px; object-fit: cover"
+                    class="rounded"
+                  />
+                  {% else %} - {% endif %}
+                </td>
+                <td>
+                  {% if item.header.status == 'Pending' %}
+                  <span class="badge bg-warning text-dark">รอจัดส่ง</span>
+                  {% else %}
+                  <span class="badge bg-success">เรียบร้อย</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <!-- Link Header to Detail -->
+                  <a
+                    href="{% url 'po_detail' item.header.id %}"
+                    class="text-info text-decoration-none"
+                  >
+                    {{ item.header.po_number }}
+                  </a>
+                </td>
+                <td>{{ item.header.shipping_type }}</td>
+                <td>{{ item.header.order_date|date:"d/m/Y" }}</td>
+                <td>{{ item.header.estimated_date|date:"d/m/Y" }}</td>
+                <td>
+                  <span
+                    class="fw-bold {% if item.total_received_qty == item.qty_ordered %}text-success{% else %}text-warning{% endif %}"
+                  >
+                    {{ item.total_received_qty }}
+                  </span>
+                  / {{ item.qty_ordered }}
+                </td>
+                <td class="text-end">{{ item.price_yuan|intcomma }}</td>
+                <td class="text-end fw-bold">{{ item.price_baht|intcomma }}</td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="11" class="text-center py-4 text-muted">
+                  ไม่พบข้อมูลใบสั่งซื้อ
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

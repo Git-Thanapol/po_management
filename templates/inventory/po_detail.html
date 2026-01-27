@@ -1,0 +1,527 @@
+{% extends 'base.html' %} {% load humanize %} {% block title %}PO #{{
+po.po_number }} - รายละเอียด{% endblock %} {% block content %}
+<div class="row mb-4">
+  <div class="col-12 d-flex justify-content-between align-items-center">
+    <div>
+      <h2 class="mb-0">
+        📄 รายละเอียดใบสั่งซื้อ (Detail) #<span class="text-info"
+          >{{ po.po_number }}</span
+        >
+      </h2>
+      <span
+        class="badge {% if po.status == 'Pending' %}bg-warning text-dark{% else %}bg-success{% endif %} mt-2 fs-6"
+      >
+        {{ po.status }}
+      </span>
+    </div>
+    <div>
+      <a href="{% url 'po_list' %}" class="btn btn-outline-light">
+        <i class="bi bi-arrow-left"></i> ย้อนกลับ
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- Header Info Form -->
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="update_header" />
+
+  <div class="card mb-4 shadow-sm border-secondary">
+    <div
+      class="card-header bg-dark border-secondary d-flex justify-content-between align-items-center"
+    >
+      <h5 class="mb-0 text-white">
+        <i class="bi bi-info-circle"></i> ข้อมูลทั่วไป (Header Info)
+      </h5>
+      {% if po.status == 'Pending' %}
+      <button type="submit" class="btn btn-sm btn-primary">
+        <i class="bi bi-save"></i> บันทึกแก้ไข (Save Header)
+      </button>
+      {% endif %}
+    </div>
+    <div class="card-body bg-dark text-white">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label text-muted">เลขใบสั่งซื้อ (PO No.)</label>
+          <input
+            type="text"
+            name="po_number"
+            class="form-control bg-dark text-white border-secondary"
+            value="{{ po.po_number }}"
+            {%
+            if
+            po.status
+            !="Pending"
+            %}readonly{%
+            endif
+            %}
+          />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label text-muted"
+            >วันที่สั่งซื้อ (Order Date)</label
+          >
+          <input
+            type="date"
+            name="order_date"
+            class="form-control bg-dark text-white border-secondary"
+            value="{{ po.order_date|date:'Y-m-d' }}"
+            {%
+            if
+            po.status
+            !="Pending"
+            %}readonly{%
+            endif
+            %}
+          />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label text-muted">ประเภท (Type)</label>
+          <select
+            name="order_type"
+            class="form-select bg-dark text-white border-secondary"
+            {%
+            if
+            po.status
+            !="Pending"
+            %}disabled{%
+            endif
+            %}
+          >
+            <option
+              value="IMPORTED"
+              {%
+              if
+              po.order_type=""
+              ="IMPORTED"
+              %}selected{%
+              endif
+              %}
+            >
+              นำเข้า (Imported)
+            </option>
+            <option
+              value="DOMESTIC"
+              {%
+              if
+              po.order_type=""
+              ="DOMESTIC"
+              %}selected{%
+              endif
+              %}
+            >
+              ในประเทศ (Domestic)
+            </option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label text-muted">ขนส่ง (Shipping)</label>
+          <select
+            name="shipping_type"
+            class="form-select bg-dark text-white border-secondary"
+            {%
+            if
+            po.status
+            !="Pending"
+            %}disabled{%
+            endif
+            %}
+          >
+            <option
+              value="CAR"
+              {%
+              if
+              po.shipping_type=""
+              ="CAR"
+              %}selected{%
+              endif
+              %}
+            >
+              รถ (Car)
+            </option>
+            <option
+              value="SHIP"
+              {%
+              if
+              po.shipping_type=""
+              ="SHIP"
+              %}selected{%
+              endif
+              %}
+            >
+              เรือ (Ship)
+            </option>
+            <option
+              value="AIR"
+              {%
+              if
+              po.shipping_type=""
+              ="AIR"
+              %}selected{%
+              endif
+              %}
+            >
+              เครื่องบิน (Air)
+            </option>
+          </select>
+        </div>
+        <!-- Editable Fields -->
+        <div class="col-md-4">
+          <label class="form-label">ค่าขนส่ง (บาท)</label>
+          <input
+            type="number"
+            step="0.01"
+            name="shipping_cost_baht"
+            class="form-control bg-dark text-white border-secondary"
+            value="{{ po.shipping_cost_baht }}"
+            {%
+            if
+            po.status
+            !="Pending"
+            %}readonly{%
+            endif
+            %}
+          />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">หมายเหตุ</label>
+          <textarea
+            name="note"
+            class="form-control bg-dark text-white border-secondary"
+            rows="2"
+            {%
+            if
+            po.status
+            !="Pending"
+            %}readonly{%
+            endif
+            %}
+          >
+{{ po.note }}</textarea
+          >
+        </div>
+        <div class="col-12">
+          <hr class="border-secondary opacity-50" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">ลิงก์ร้านค้า (Shop Link)</label>
+          <input
+            type="url"
+            name="link_shop"
+            class="form-control bg-dark text-white border-secondary"
+            value="{{ po.link_shop }}"
+            {%
+            if
+            po.status
+            !="Pending"
+            %}readonly{%
+            endif
+            %}
+          />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">WeChat Contact</label>
+          <input
+            type="text"
+            name="wechat_contact"
+            class="form-control bg-dark text-white border-secondary"
+            value="{{ po.wechat_contact }}"
+            {%
+            if
+            po.status
+            !="Pending"
+            %}readonly{%
+            endif
+            %}
+          />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">เลขพัสดุจีน (Tracking No.)</label>
+          <input
+            type="text"
+            name="tracking_no"
+            class="form-control bg-dark text-white border-secondary"
+            value="{{ po.tracking_no }}"
+            {%
+            if
+            po.status
+            !="Pending"
+            %}readonly{%
+            endif
+            %}
+          />
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+
+<!-- Items Table Form (For Receiving or Editing Items?) 
+     For V1, let's keep Item Edit separated or just focus on Receiving if not pending.
+     If Pending, maybe we want to edit Qty? 
+     Let's handle Bulk Receive here. Item Edit maybe later or complex.
+-->
+<form method="post" id="itemsForm">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="receive_items" />
+
+  <div class="card shadow-sm border-secondary">
+    <div
+      class="card-header bg-dark border-secondary d-flex justify-content-between align-items-center"
+    >
+      <h5 class="mb-0 text-white">
+        <i class="bi bi-list-check"></i> รายการสินค้า (Items)
+      </h5>
+
+      <!-- Allow receiving always, logic handles completion -->
+      <div
+        class="d-flex flex-wrap align-items-end justify-content-between gap-3"
+      >
+        <!-- Date & Receive Action -->
+        <div class="d-flex gap-2 align-items-center">
+          <div class="input-group input-group-sm" style="width: auto">
+            <span
+              class="input-group-text bg-secondary text-white border-secondary"
+            >
+              <i class="bi bi-calendar3 me-1"></i> วันที่รับ
+            </span>
+            <input
+              type="date"
+              name="receive_date"
+              class="form-control bg-dark text-white border-secondary"
+              value="{% now 'Y-m-d' %}"
+            />
+          </div>
+
+          <button
+            type="submit"
+            class="btn btn-sm btn-success fw-bold text-nowrap px-3 shadow-sm"
+          >
+            <i class="bi bi-box-seam-fill me-1"></i> รับสินค้าที่เลือก
+          </button>
+        </div>
+
+        <!-- History Button -->
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-info text-nowrap"
+          data-bs-toggle="modal"
+          data-bs-target="#historyModal"
+        >
+          <i class="bi bi-clock-history me-1"></i> ประวัติการรับเข้า
+        </button>
+      </div>
+    </div>
+
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-dark table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th style="width: 40px">
+                <input type="checkbox" id="selectAll" />
+              </th>
+              <th style="width: 60px">Img</th>
+              <th>SKU / Name</th>
+              <th class="text-center">สั่งซื้อ</th>
+              <th class="text-center text-success">รับแล้ว</th>
+              <th class="text-center">ค้างรับ</th>
+              <th style="width: 100px" class="text-center">
+                รับครั้งนี้ (Qty)
+              </th>
+              <th style="width: 100px" class="text-center">CBM</th>
+              <th style="width: 100px" class="text-center">Weight</th>
+              <th class="text-end">ราคา (¥)</th>
+              <th class="text-end">รวม (฿)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in po.items.all %}
+            <tr>
+              <td>
+                <!-- Only show checkbox if not fully received -->
+                {% if item.qty_ordered > item.total_received_qty %}
+                <input
+                  type="checkbox"
+                  class="item-check"
+                  id="chk_{{ item.id }}"
+                  data-remaining="{{ item.remaining_qty }}"
+                  onchange="onCheckboxChange('{{ item.id }}')"
+                />
+                {% endif %}
+              </td>
+              <td>
+                {% if item.sku.image %}
+                <img
+                  src="{{ item.sku.image.url }}"
+                  style="height: 40px"
+                  class="rounded"
+                />
+                {% endif %}
+              </td>
+              <td>
+                <div class="fw-bold">{{ item.sku.product_code }}</div>
+                <div class="small text-muted">
+                  {{ item.sku.name|truncatechars:30 }}
+                </div>
+              </td>
+              <td class="text-center fw-bold">{{ item.qty_ordered }}</td>
+              <td class="text-center text-success">
+                {{ item.total_received_qty }}
+              </td>
+              <td class="text-center text-warning">{{ item.remaining_qty }}</td>
+              <td>
+                {% if item.qty_ordered > item.total_received_qty %}
+                <input
+                  type="number"
+                  name="receive_qty_{{ item.id }}"
+                  id="qty_{{ item.id }}"
+                  class="form-control form-control-sm bg-secondary text-white border-secondary text-center"
+                  data-remaining="{{ item.remaining_qty }}"
+                  oninput="onInputChange('{{ item.id }}')"
+                  placeholder="0"
+                />
+                {% else %}
+                <span class="badge bg-success">✓</span>
+                {% endif %}
+              </td>
+              <td>
+                <input
+                  type="number"
+                  step="0.01"
+                  name="receive_cbm_{{ item.id }}"
+                  class="form-control form-control-sm bg-secondary text-white border-secondary text-center"
+                  placeholder="0"
+                />
+              </td>
+              <td>
+                <input
+                  type="number"
+                  step="0.01"
+                  name="receive_weight_{{ item.id }}"
+                  class="form-control form-control-sm bg-secondary text-white border-secondary text-center"
+                  placeholder="0"
+                />
+              </td>
+              <td class="text-end">{{ item.price_yuan }}</td>
+              <td class="text-end">{{ item.price_baht|intcomma }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</form>
+
+<script>
+  // When checkbox changes
+  function onCheckboxChange(itemId) {
+    const checkbox = document.getElementById("chk_" + itemId);
+    const input = document.getElementById("qty_" + itemId);
+
+    if (checkbox.checked) {
+      // If checked and input empty, auto-fill remaining
+      if (!input.value) {
+        input.value = input.getAttribute("data-remaining");
+      }
+      input.focus();
+    } else {
+      // If unchecked, clear input? Or keep it?
+      // User might uncheck to exclude it. Clearing seems safer to avoid accidental submission if logic depends on check.
+      // Actually backend logic iterates keys `receive_qty_...` directly?
+      // Let's check backend view:
+      // `for key, value in request.POST.items(): if key.startswith('receive_qty_') and value:`
+      // It does NOT check the checkbox value in POST!
+      // So clearing value is CRITICAL if we rely on visual "unchecked".
+      input.value = "";
+    }
+  }
+
+  // When input changes
+  function onInputChange(itemId) {
+    const checkbox = document.getElementById("chk_" + itemId);
+    const input = document.getElementById("qty_" + itemId);
+    const val = parseFloat(input.value);
+
+    if (val > 0) {
+      checkbox.checked = true;
+    } else {
+      checkbox.checked = false;
+    }
+  }
+
+  // Select All
+  document.getElementById("selectAll").addEventListener("change", function () {
+    const checkboxes = document.querySelectorAll(".item-check");
+    checkboxes.forEach((cb) => {
+      // Avoid triggering logic for every row if unnecessary, or trigger it to fill all?
+      // Better to trigger logic so all inputs get filled.
+      const itemId = cb.getAttribute("id").split("_")[1];
+      cb.checked = this.checked;
+      onCheckboxChange(itemId);
+    });
+  });
+</script>
+
+<!-- History Modal -->
+<div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content bg-dark text-white border-secondary">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title">
+          <i class="bi bi-clock-history"></i> ประวัติการรับสินค้า (Receiving
+          History)
+        </h5>
+        <button
+          type="button"
+          class="btn-close btn-close-white"
+          data-bs-dismiss="modal"
+          aria-label="Close"
+        ></button>
+      </div>
+      <div class="modal-body">
+        <div class="table-responsive">
+          <table class="table table-dark table-sm table-hover">
+            <thead>
+              <tr>
+                <th>วันที่รับ</th>
+                <th>SKU</th>
+                <th>ชื่อสินค้า</th>
+                <th class="text-end">จำนวน (Qty)</th>
+                <th class="text-end">CBM</th>
+                <th class="text-end">น้ำหนัก (KG)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in po.items.all %} 
+		{% for receipt in item.receipts.all%}
+              <tr>
+                <td>{{ receipt.received_date|date:"d/m/Y" }}</td>
+                <td class="fw-bold">{{ item.sku.product_code }}</td>
+                <td>{{ item.sku.name|truncatechars:40 }}</td>
+                <td class="text-end">{{ receipt.received_qty }}</td>
+                <td class="text-end">
+                  {{ receipt.received_cbm|floatformat:4 }}
+                </td>
+                <td class="text-end">
+                  {{ receipt.received_weight|floatformat:2 }}
+                </td>
+              </tr>
+              	{% endfor %} 
+	            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer border-secondary">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          ปิด
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,127 @@
+{% load humanize %}
+<div class="table-responsive">
+  <table
+    class="table table-dark table-bordered table-sm text-nowrap align-middle"
+    style="font-size: 0.85rem"
+  >
+    <thead>
+      <tr class="text-center align-middle bg-primary text-white">
+        <th>รหัสสินค้า</th>
+        <th>รูปสินค้า</th>
+        <th>สถานะ</th>
+        <th>เลข PO</th>
+        <th>ประเภทการนำเข้า</th>
+        <th>วันที่สั่งซื้อ</th>
+        <th>วันคาดการณ์</th>
+        <th>วันที่ได้รับ</th>
+        <th>ระยะเวลา</th>
+        <th>จำนวนที่ได้รับ</th>
+        <th>จำนวนสั่งซื้อ</th>
+        <th>ต้นทุน/ชิ้น (฿)</th>
+        <th>ยอดเงินหยวน (¥)</th>
+        <th>ยอดเงินบาทที่ใช้ (฿)</th>
+        <th>เรทเงิน</th>
+        <th>เรทค่าขนส่ง</th>
+        <th>ขนาด (คิว)</th>
+        <th>ค่าส่ง</th>
+        <th>น้ำหนัก / KG</th>
+        <th>ราคา / ชิ้น (หยวน)</th>
+        <th>SHOPEE</th>
+        <th>LAZADA</th>
+        <th>TIKTOK</th>
+        <th>หมายเหตุ</th>
+        <th>ร้านค้า</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in history_items %}
+      <tr>
+        <td class="fw-bold text-center">{{ row.item.sku.product_code }}</td>
+        <td class="text-center">
+          {% if row.item.sku.image %}
+          <img
+            src="{{ row.item.sku.image.url }}"
+            style="height: 30px; width: auto"
+            class="rounded"
+          />
+          {% endif %}
+        </td>
+        <td class="text-center">
+          {% if row.item.header.status == 'Pending' %}
+          <span class="badge bg-warning text-dark">รอจัดส่ง</span>
+          {% elif row.item.header.status == 'Complete' %}
+          <span class="badge bg-success">เรียบร้อย</span>
+          {% else %}
+          <span class="badge bg-secondary">{{ row.item.header.status }}</span>
+          {% endif %}
+        </td>
+        <td class="text-center">{{ row.item.header.po_number }}</td>
+        <td class="text-center">
+          {{ row.item.header.get_order_type_display }}
+        </td>
+        <td class="text-center">
+          {{ row.item.header.order_date|date:"d/m/Y" }}
+        </td>
+        <td class="text-center">
+          {{ row.item.header.estimated_date|date:"d/m/Y"|default:"-" }}
+        </td>
+        <td class="text-center">
+          {{ row.received_date|date:"d/m/Y"|default:"-" }}
+        </td>
+        <td class="text-center">
+          {% if row.duration %} {{ row.duration }} วัน {% else %} - {% endif %}
+        </td>
+        <td class="text-end text-success fw-bold">
+          {{ row.item.total_received_qty|intcomma }}
+        </td>
+        <td class="text-end">{{ row.item.qty_ordered|intcomma }}</td>
+        <td class="text-end">{{ row.cost_per_piece|floatformat:2 }}</td>
+        <td class="text-end">{{ row.total_yuan|floatformat:2 }}</td>
+        <td class="text-end">{{ row.item.price_baht|floatformat:2 }}</td>
+        <td class="text-end">
+          {{ row.item.header.exchange_rate|floatformat:2 }}
+        </td>
+        <td class="text-end">-</td>
+        <!-- Shipping Rate? -->
+        <td class="text-end">{{ row.item.cbm|floatformat:2|default:"-" }}</td>
+        <td class="text-end">
+          {{ row.item.header.shipping_cost_baht|floatformat:2 }}
+        </td>
+        <td class="text-end">
+          {{ row.item.weight|floatformat:2|default:"-" }}
+        </td>
+        <td class="text-end">{{ row.item.price_yuan|floatformat:2 }}</td>
+
+        <!-- Platform Prices -->
+        <td class="text-end">
+          {{ row.item.header.shopee_price|floatformat:2|default:"-" }}
+        </td>
+        <td class="text-end">
+          {{ row.item.header.lazada_price|floatformat:2|default:"-" }}
+        </td>
+        <td class="text-end">
+          {{ row.item.header.tiktok_price|floatformat:2|default:"-" }}
+        </td>
+
+        <td>{{ row.item.header.note|default:"-" }}</td>
+        <td>
+          {% if row.item.header.link_shop %}
+          <a
+            href="{{ row.item.header.link_shop }}"
+            target="_blank"
+            class="text-info"
+            ><i class="bi bi-link-45deg"></i> Link</a
+          >
+          {% else %} - {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="25" class="text-center py-3 text-muted">
+          ไม่พบประวัติการสั่งซื้อ
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

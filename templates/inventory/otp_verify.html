@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+{% block title %}Verify OTP - JST System{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-4">
+        <div class="card shadow">
+            <div class="card-header bg-success text-white text-center">
+                <h4>🔢 ยืนยันรหัส OTP</h4>
+            </div>
+            <div class="card-body">
+                <p class="text-center text-muted">รหัส OTP ถูกส่งไปยัง {{ request.session.otp_email }}</p>
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="otp" class="form-label">กรอกรหัส 6 หลัก</label>
+                        <input type="text" class="form-control text-center" id="otp" name="otp" required maxlength="6"
+                            style="font-size: 24px; letter-spacing: 5px;">
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-success">ยืนยัน (Verify)</button>
+                    </div>
+                </form>
+                <div class="text-center mt-3">
+                    <a href="{% url 'login' %}" class="text-white-50">ขอรหัสใหม่ / เปลี่ยนอีเมล</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

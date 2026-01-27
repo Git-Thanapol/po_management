@@ -1,0 +1,245 @@
+{% extends 'base.html' %} {% load humanize %} {% block title %}Daily Sales
+Summary - JST System{% endblock %} {% block content %}
+<div class="row mb-4">
+  <div class="col-12">
+    <h2 class="mb-3">🗓️ รายงานสินค้าคงเหลือ</h2>
+
+    <!-- Filter Section -->
+    <div class="card p-3 shadow-sm mb-3">
+      <form method="get" class="row g-3">
+        <div class="col-md-3">
+          <label class="form-label">สถานะ (Status)</label>
+          <select name="status" class="form-select">
+            <option value="">ทั้งหมด (All)</option>
+            <option
+              value="empty"
+              {%
+              if
+              selected_status=""
+              ="empty"
+              %}selected{%
+              endif
+              %}
+            >
+              🔴 หมดเกลี้ยง
+            </option>
+            <option
+              value="low"
+              {%
+              if
+              selected_status=""
+              ="low"
+              %}selected{%
+              endif
+              %}
+            >
+              ⚠️ ของใกล้หมด
+            </option>
+            <option
+              value="ok"
+              {%
+              if
+              selected_status=""
+              ="ok"
+              %}selected{%
+              endif
+              %}
+            >
+              🟢 มีของ
+            </option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">หมวดหมู่สินค้า</label>
+          <select name="category" class="form-select">
+            <option value="" {% if not selected_category %}selected{% endif %}>
+              แสดงทั้งหมด
+            </option>
+            {% for cat in categories %} {% if cat %}
+            <option
+              value="{{ cat }}"
+              {%
+              if
+              cat=""
+              ="selected_category"
+              %}selected{%
+              endif
+              %}
+            >
+              {{ cat }}
+            </option>
+            {% endif %} {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">ค้นหา (Search)</label>
+          <input
+            type="text"
+            name="search"
+            class="form-control"
+            value="{{ search_query }}"
+            placeholder="SKU หรือ ชื่อสินค้า..."
+          />
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+          <button type="submit" class="btn btn-primary w-100">ค้นหา</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Main Table -->
+    <div class="card shadow-sm">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover table-striped align-middle mb-0">
+            <thead class="table-dark text-nowrap">
+              <tr>
+                <th class="text-center" style="width: 60px">ประวัติ</th>
+                <th>รหัส</th>
+                <th>รูป</th>
+                <th>ชื่อสินค้า</th>
+                <th class="text-center">คงเหลือ</th>
+                <th class="text-center">รับเข้า</th>
+                <th class="text-center">ยอดขาย</th>
+                <th class="text-center" style="width: 100px">จุดเตือน</th>
+                <th class="text-center">สถานะ</th>
+              </tr>
+            </thead>
+            <tbody>
+              <form
+                id="bulkUpdateForm"
+                action="{% url 'update_min_limit' 'bulk' %}"
+                method="post"
+              >
+                {% csrf_token %} {% for item in stock_items %}
+                <tr>
+                  <td class="text-center">
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-warning border-0"
+                      onclick="loadHistory('{{ item.sku }}')"
+                    >
+                      <i class="bi bi-journal-text fs-5"></i>
+                    </button>
+                  </td>
+                  <td class="fw-bold text-primary">{{ item.sku }}</td>
+                  <td>
+                    {% if item.image_url %}
+                    <img
+                      src="{{ item.image_url }}"
+                      alt="{{ item.sku }}"
+                      class="rounded"
+                      style="height: 40px; width: 40px; object-fit: cover"
+                    />
+                    {% else %}
+                    <span class="text-muted small">No Image</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ item.name|truncatechars:40 }}</td>
+                  <td class="text-center fw-bold fs-5">
+                    {{ item.qty|intcomma }}
+                  </td>
+                  <td class="text-center text-info">
+                    +{{ item.total_received|intcomma }}
+                  </td>
+                  <td class="text-center text-success">
+                    -{{ item.total_sales|intcomma }}
+                  </td>
+                  <td class="text-center">
+                    <input
+                      type="number"
+                      name="limit_{{ item.sku }}"
+                      class="form-control form-control-sm text-center mx-auto"
+                      style="width: 70px"
+                      value="{{ item.min_limit }}"
+                    />
+                  </td>
+                  <td class="text-center">
+                    {% if "หมด" in item.status %}
+                    <span class="badge rounded-pill bg-danger">หมด</span>
+                    {% elif "ใกล้" in item.status %}
+                    <span class="badge rounded-pill bg-warning text-dark"
+                      >ใกล้หมด</span
+                    >
+                    {% else %}
+                    <span class="badge rounded-pill bg-success">ปกติ</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="9" class="text-center py-4 text-muted">
+                    ไม่พบข้อมูล
+                  </td>
+                </tr>
+                {% endfor %}
+              </form>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- History Modal -->
+<div
+  class="modal fade"
+  id="historyModal"
+  tabindex="-1"
+  aria-labelledby="historyModalLabel"
+  aria-hidden="true"
+>
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content bg-dark text-light border-secondary">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title" id="historyModalLabel">
+          ประวัติการสั่งซื้อสินค้า
+        </h5>
+        <button
+          type="button"
+          class="btn-close btn-close-white"
+          data-bs-dismiss="modal"
+          aria-label="Close"
+        ></button>
+      </div>
+      <div class="modal-body p-0">
+        <!-- Content loaded via AJAX -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function loadHistory(sku) {
+    const modalBody = document.querySelector("#historyModal .modal-body");
+    modalBody.innerHTML =
+      '<div class="text-center py-5"><div class="text-primary spinner-border" role="status"></div><p class="mt-2 text-muted">Loading History...</p></div>';
+
+    // Set Title
+    const modalTitle = document.querySelector("#historyModalLabel");
+    modalTitle.textContent = "ประวัติการสั่งซื้อสินค้า: " + sku;
+
+    // Show Modal
+    var myModal = new bootstrap.Modal(document.getElementById("historyModal"));
+    myModal.show();
+
+    // Fetch Data (Mounted at root)
+    const url = `/stock/history/${encodeURIComponent(sku)}/`;
+    fetch(url)
+      .then((response) => {
+        if (!response.ok) throw new Error("Network response was not ok");
+        return response.text();
+      })
+      .then((html) => {
+        modalBody.innerHTML = html;
+      })
+      .catch((error) => {
+        modalBody.innerHTML =
+          '<div class="alert alert-danger m-3">Error loading history: ' +
+          error +
+          "</div>";
+      });
+  }
+</script>
+{% endblock %}

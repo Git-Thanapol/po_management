@@ -1,0 +1,229 @@
+{% extends 'base.html' %} {% load humanize %} {% block title %}สรุปยอดขายรายวัน
+- JST System{% endblock %} {% block content %}
+<div class="row mb-4">
+  <div class="col-12">
+    <h2 class="mb-3">📅 สรุปยอดขายรายวัน / การเคลื่อนไหวสินค้า</h2>
+
+    <!-- Filter Section -->
+    <div class="card p-3 shadow-sm mb-3">
+      <h5 class="card-title text-primary">
+        <i class="bi bi-funnel"></i> ตัวกรองข้อมูล (Filter)
+      </h5>
+      <form method="get" class="row g-3">
+        <div class="col-md-2">
+          <label class="form-label">ปี (Year)</label>
+          <select name="year" class="form-select">
+            {% for y in years %}
+            <option
+              value="{{ y }}"
+              {%
+              if
+              y=""
+              ="selected_year"
+              %}selected{%
+              endif
+              %}
+            >
+              {{ y }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">เดือน (Month)</label>
+          <select name="month" class="form-select">
+            {% for m_idx, m_name in thai_months %}
+            <option
+              value="{{ m_idx }}"
+              {%
+              if
+              m_idx=""
+              ="selected_month"
+              %}selected{%
+              endif
+              %}
+            >
+              {{ m_name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">หมวดหมู่สินค้า</label>
+          <select name="category" class="form-select">
+            <option value="" {% if not selected_category %}selected{% endif %}>
+              แสดงทั้งหมด
+            </option>
+            {% for cat in categories %} {% if cat %}
+            <option
+              value="{{ cat }}"
+              {%
+              if
+              cat=""
+              ="selected_category"
+              %}selected{%
+              endif
+              %}
+            >
+              {{ cat }}
+            </option>
+            {% endif %} {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">ค้นหา (SKU/Name)</label>
+          <input
+            type="text"
+            name="search"
+            class="form-control"
+            value="{{ search_query }}"
+            placeholder="รหัส หรือ ชื่อสินค้า..."
+          />
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-search"></i> ค้นหา
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Main Table -->
+    <div class="card shadow-sm">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover table-striped align-middle mb-0">
+            <thead class="table-dark text-nowrap">
+              <tr>
+                <th class="text-center" style="width: 60px">ประวัติ</th>
+                <th>รหัสสินค้า</th>
+                <th>รูป</th>
+                <th>ชื่อสินค้า</th>
+                <th class="text-end">ยอดขาย (ชิ้น)</th>
+                <th class="text-end">ยอดขาย (฿)</th>
+                <th class="text-end">คงเหลือ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in products %}
+              <tr>
+                <td class="text-center">
+                  <button
+                    class="btn btn-sm btn-outline-info border-0"
+                    onclick="loadSalesHistory('{{ item.product_code|escapejs }}')"
+                  >
+                    <i class="bi bi-clock-history fs-5"></i>
+                  </button>
+                </td>
+                <td class="fw-bold text-primary">{{ item.product_code }}</td>
+                <td>
+                  {% if item.image %}
+                  <img
+                    src="{{ item.image.url }}"
+                    alt="{{ item.product_code }}"
+                    class="rounded"
+                    style="height: 40px; width: 40px; object-fit: cover"
+                  />
+                  {% else %}
+                  <span class="text-muted small">No Img</span>
+                  {% endif %}
+                </td>
+                <td>{{ item.name|truncatechars:40 }}</td>
+                <td class="text-end fw-bold text-success">
+                  {{ item.period_qty|intcomma }}
+                </td>
+                <td class="text-end text-primary fw-bold">
+                  {{ item.period_amount|floatformat:2|intcomma }}
+                </td>
+                <td class="text-end text-muted">
+                  {{ item.current_stock|intcomma }}
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="7" class="text-center py-4 text-muted">
+                  ไม่พบข้อมูลสินค้า
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot class="table-light fw-bold">
+              <tr>
+                <td colspan="5" class="text-end">รวมยอดขายทั้งสิ้น</td>
+                <td class="text-end text-primary">
+                  {{ total_period_sales|floatformat:2|intcomma }} ฿
+                </td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- History Modal -->
+<div
+  class="modal fade"
+  id="salesHistoryModal"
+  tabindex="-1"
+  aria-labelledby="salesHistoryModalLabel"
+  aria-hidden="true"
+>
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content bg-dark text-light border-secondary">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title" id="salesHistoryModalLabel">
+          ประวัติการขาย (Sales History)
+        </h5>
+        <button
+          type="button"
+          class="btn-close btn-close-white"
+          data-bs-dismiss="modal"
+          aria-label="Close"
+        ></button>
+      </div>
+      <div class="modal-body p-0">
+        <!-- Content loaded via AJAX -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function loadSalesHistory(sku) {
+    const modalBody = document.querySelector("#salesHistoryModal .modal-body");
+    modalBody.innerHTML =
+      '<div class="text-center py-5"><div class="spinner-border text-info" role="status"></div><p class="mt-2 text-muted">Loading Sales History...</p></div>';
+
+    // Set Title
+    const modalTitle = document.querySelector("#salesHistoryModalLabel");
+    modalTitle.textContent = "ประวัติการขาย: " + sku;
+
+    // Show Modal
+    var myModal = new bootstrap.Modal(
+      document.getElementById("salesHistoryModal"),
+    );
+    myModal.show();
+
+    // Fetch Data (Root Path)
+    const url = `/sales/history/${encodeURIComponent(sku)}/`;
+
+    fetch(url)
+      .then((response) => {
+        if (!response.ok) throw new Error("Network response was not ok");
+        return response.text();
+      })
+      .then((html) => {
+        modalBody.innerHTML = html;
+      })
+      .catch((error) => {
+        modalBody.innerHTML =
+          '<div class="alert alert-danger m-3">Error loading history: ' +
+          error +
+          "</div>";
+      });
+  }
+</script>
+{% endblock %}

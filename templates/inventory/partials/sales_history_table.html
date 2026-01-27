@@ -1,0 +1,66 @@
+{% load humanize %}
+<div class="table-responsive">
+  <table
+    class="table table-dark table-striped table-bordered table-sm text-nowrap align-middle"
+    style="font-size: 0.85rem"
+  >
+    <thead>
+      <tr class="text-center align-middle bg-primary text-white">
+        <th>วันที่</th>
+        <th>สถานะ</th>
+        <th>Platform</th>
+        <th>Order ID</th>
+        <th>ร้านค้า</th>
+        <th class="text-end">จำนวน</th>
+        <th class="text-end">ราคา/ชิ้น</th>
+        <th class="text-end">ยอดรวม</th>
+        <th class="text-end">ค่าธรรมเนียมรวม</th>
+        <th class="text-end">สุทธิ</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for sale in sales %}
+      <tr>
+        <td class="text-center">{{ sale.date|date:"d/m/Y" }}</td>
+        <td class="text-center">
+          <span class="badge {{ sale.status_class }}">{{ sale.status }}</span>
+        </td>
+        <td class="text-center">
+          {% if sale.platform_color %}
+          <span
+            class="badge"
+            style="background-color: {{ sale.platform_color }};"
+            >{{ sale.platform }}</span
+          >
+          {% else %} {{ sale.platform }} {% endif %}
+        </td>
+        <td>{{ sale.order_id }}</td>
+        <td>{{ sale.shop_name|default:"-" }}</td>
+        <td class="text-end fw-bold">{{ sale.qty|intcomma }}</td>
+        <td class="text-end">{{ sale.price|floatformat:2 }}</td>
+        <td class="text-end text-info">{{ sale.total_price|floatformat:2 }}</td>
+        <td class="text-end text-danger">-{{ sale.fees|floatformat:2 }}</td>
+        <td class="text-end text-success fw-bold">
+          {{ sale.net_price|floatformat:2 }}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="10" class="text-center py-3 text-muted">
+          ไม่พบข้อมูลการขาย
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot class="table-light text-dark fw-bold">
+      <tr>
+        <td colspan="5" class="text-end">รวมทั้งหมด</td>
+        <td class="text-end">{{ total_qty|intcomma }}</td>
+        <td></td>
+        <td class="text-end">{{ total_amount|floatformat:2 }}</td>
+        <td></td>
+        <td class="text-end">{{ total_net|floatformat:2 }}</td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
