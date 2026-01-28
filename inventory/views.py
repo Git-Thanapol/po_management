@@ -387,32 +387,52 @@ def daily_sales_view(request):
     today = date.today()
     default_end = today + timedelta(days=30)
     
-    start_date_str = request.GET.get('start_date')
-    end_date_str = request.GET.get('end_date')
+    # Session Persistence Logic
+    if not request.GET and 'sales_filter_mode' in request.session:
+        # Load from session if no GET params and session exists
+        start_date_str = request.session.get('sales_start_date')
+        end_date_str = request.session.get('sales_end_date')
+        search_query = request.session.get('sales_search', '')
+        filter_mode = request.session.get('sales_filter_mode', 'general')
+        movement_filter = request.session.get('sales_movement', 'all')
+        focus_date_str = request.session.get('sales_focus_date', '')
+        selected_category = request.session.get('sales_category', '')
+    else:
+        # Load from GET or use Defaults (and save to session if GET is present, or just always save current state)
+        # Using .get() returns None if missing, so we handle defaults below
+        start_date_str = request.GET.get('start_date')
+        end_date_str = request.GET.get('end_date')
+        search_query = request.GET.get('search', '').strip()
+        filter_mode = request.GET.get('filter_mode', 'general')
+        movement_filter = request.GET.get('movement', 'all')
+        focus_date_str = request.GET.get('focus_date', '')
+        selected_category = request.GET.get('category', '').strip()
+        
+        # Save to session (only if meaningful? easier to always save current view state)
+        request.session['sales_start_date'] = start_date_str
+        request.session['sales_end_date'] = end_date_str
+        request.session['sales_search'] = search_query
+        request.session['sales_filter_mode'] = filter_mode
+        request.session['sales_movement'] = movement_filter
+        request.session['sales_focus_date'] = focus_date_str
+        request.session['sales_category'] = selected_category
     
     # Parse dates or use defaults
     try:
         start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date() if start_date_str else today
-    except ValueError:
+    except (ValueError, TypeError):
         start_date = today
 
     try:
         end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date() if end_date_str else default_end
-    except ValueError:
+    except (ValueError, TypeError):
         end_date = default_end
-        
-    search_query = request.GET.get('search', '').strip()
-    
-    # Filter Modes
-    filter_mode = request.GET.get('filter_mode', 'general') # general, focus
-    movement_filter = request.GET.get('movement', 'all') # all, active, inactive
-    focus_date_str = request.GET.get('focus_date', '')
     
     focus_date = None
     if focus_date_str:
         try:
             focus_date = datetime.strptime(focus_date_str, '%Y-%m-%d').date()
-        except ValueError:
+        except (ValueError, TypeError):
             pass
 
     # 1. Base Product Query
@@ -423,7 +443,6 @@ def daily_sales_view(request):
 
     # Category Filter
     categories = MasterItem.objects.values_list('category', flat=True).distinct().order_by('category')
-    selected_category = request.GET.get('category', '').strip()
     if selected_category:
         products = products.filter(category=selected_category)
         
