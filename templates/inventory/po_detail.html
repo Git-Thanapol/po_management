@@ -34,11 +34,10 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
       <h5 class="mb-0 text-white">
         <i class="bi bi-info-circle"></i> ข้อมูลทั่วไป (Header Info)
       </h5>
-      {% if po.status == 'Pending' %}
+      <!-- Always show Save Button per user request -->
       <button type="submit" class="btn btn-sm btn-primary">
         <i class="bi bi-save"></i> บันทึกแก้ไข (Save Header)
       </button>
-      {% endif %}
     </div>
     <div class="card-body bg-dark text-white">
       <!-- Row 1: Basic Info -->
@@ -342,7 +341,7 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
                 class="badge bg-secondary text-decoration-none"
               >
                 <i class="bi bi-paperclip"></i> 
-		{{ file.filename|truncatechars:15 }}
+			{{ file.filename|truncatechars:15 }}
               </a>
               {% endfor %}
             </div>
@@ -425,11 +424,7 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
   </div>
 </form>
 
-<!-- Items Table Form (For Receiving or Editing Items?) 
-     For V1, let's keep Item Edit separated or just focus on Receiving if not pending.
-     If Pending, maybe we want to edit Qty? 
-     Let's handle Bulk Receive here. Item Edit maybe later or complex.
--->
+<!-- Items Table Form -->
 <form method="post" id="itemsForm">
   {% csrf_token %}
   <input type="hidden" name="action" value="receive_items" />
@@ -502,7 +497,6 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
               >
                 Ordered (สั่งซื้อ)
               </th>
-
               <!-- Received Group -->
               <th
                 colspan="3"
@@ -510,7 +504,6 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
               >
                 Received (รับแล้ว)
               </th>
-
               <!-- Input Group -->
               <th
                 colspan="3"
@@ -540,7 +533,6 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
             {% for item in po.items.all %}
             <tr>
               <td>
-                <!-- Only show checkbox if not fully received -->
                 {% if item.qty_ordered > item.total_received_qty %}
                 <input
                   type="checkbox"
@@ -570,7 +562,6 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
               <td class="text-end">{{ item.price_baht|intcomma }}</td>
 
               <!-- Ordered Data -->
-              <!-- Ordered Data -->
               <td class="text-center bg-success bg-opacity-25">
                 {{ item.qty_ordered|intcomma }}
               </td>
@@ -582,7 +573,6 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
               </td>
 
               <!-- Received Data -->
-              <!-- Received Data -->
               <td class="text-center bg-info bg-opacity-25 fw-bold">
                 {{ item.total_received_qty|intcomma }}
               </td>
@@ -593,7 +583,7 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
                 {{ item.total_received_weight|floatformat:2|default_if_none:"-" }}
               </td>
 
-              <!-- Input Data -->
+              <!-- Input Data: Disable Enter Key -->
               <td class="bg-secondary bg-opacity-25" style="width: 90px">
                 {% if item.qty_ordered > item.total_received_qty %}
                 <input
@@ -603,6 +593,7 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
                   class="form-control form-control-sm bg-dark text-white border-secondary text-center"
                   data-remaining="{{ item.remaining_qty }}"
                   oninput="onInputChange('{{ item.id }}')"
+                  onkeydown="return event.key != 'Enter';"
                   placeholder="0"
                 />
                 {% else %}
@@ -615,6 +606,7 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
                   step="0.0001"
                   name="receive_cbm_{{ item.id }}"
                   class="form-control form-control-sm bg-dark text-white border-secondary text-center"
+                  onkeydown="return event.key != 'Enter';"
                   placeholder="0"
                 />
               </td>
@@ -624,6 +616,7 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
                   step="0.01"
                   name="receive_weight_{{ item.id }}"
                   class="form-control form-control-sm bg-dark text-white border-secondary text-center"
+                  onkeydown="return event.key != 'Enter';"
                   placeholder="0"
                 />
               </td>
@@ -643,19 +636,11 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
     const input = document.getElementById("qty_" + itemId);
 
     if (checkbox.checked) {
-      // If checked and input empty, auto-fill remaining
       if (!input.value) {
         input.value = input.getAttribute("data-remaining");
       }
       input.focus();
     } else {
-      // If unchecked, clear input? Or keep it?
-      // User might uncheck to exclude it. Clearing seems safer to avoid accidental submission if logic depends on check.
-      // Actually backend logic iterates keys `receive_qty_...` directly?
-      // Let's check backend view:
-      // `for key, value in request.POST.items(): if key.startswith('receive_qty_') and value:`
-      // It does NOT check the checkbox value in POST!
-      // So clearing value is CRITICAL if we rely on visual "unchecked".
       input.value = "";
     }
   }
@@ -677,8 +662,6 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
   document.getElementById("selectAll").addEventListener("change", function () {
     const checkboxes = document.querySelectorAll(".item-check");
     checkboxes.forEach((cb) => {
-      // Avoid triggering logic for every row if unnecessary, or trigger it to fill all?
-      // Better to trigger logic so all inputs get filled.
       const itemId = cb.getAttribute("id").split("_")[1];
       cb.checked = this.checked;
       onCheckboxChange(itemId);
@@ -715,7 +698,6 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
                 <th class="text-end">น้ำหนัก (KG)</th>
               </tr>
             </thead>
-            <tbody></tbody>
             <tbody>
               {% for item in po.items.all %} 
 		{% for receipt in item.receipts.all %}

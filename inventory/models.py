@@ -163,6 +163,14 @@ class ReceivedPOItem(models.Model):
     received_weight = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="น้ำหนักที่รับ")
     received_date = models.DateField(default=date.today, verbose_name="วันที่รับ")
 
+    @property
+    def duration_from_order(self):
+        if not self.po_item.header.order_date:
+            return "-"
+        delta = (self.received_date - self.po_item.header.order_date).days
+        # "ถ้าเป็นวันเดียวกันให้นับ 1" implies min 1 day
+        return delta if delta > 0 else 1
+
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
         self.update_po_item_received()

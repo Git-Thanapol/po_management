@@ -192,7 +192,7 @@
               id="itemsTable"
               style="font-size: 0.9rem"
             >
-              <thead class="table-secondary text-center">
+              <thead class="table-grey text-center">
                 <tr>
                   <th style="width: 200px">SKU</th>
                   <th style="width: 80px">Qty</th>
@@ -201,7 +201,7 @@
                   <th style="width: 70px">W (cm)</th>
                   <th style="width: 70px">L (cm)</th>
                   <th style="width: 70px">H (cm)</th>
-                  <th style="width: 80px">CBM</th>
+                  <th style="width: 80px">คิว CBM</th>
                   <th style="width: 80px">KG</th>
                   <th style="width: 50px">🗑️</th>
                 </tr>
@@ -209,7 +209,7 @@
               <tbody id="itemsBody">
                 <!-- JS will populate rows here -->
               </tbody>
-              <tfoot class="table-light">
+              <tfoot class="table-grey">
                 <tr class="fw-bold">
                   <td colspan="2" class="text-end">Total:</td>
                   <td class="import-col text-end">
@@ -276,7 +276,7 @@
             <td><input type="number" name="l_${rowCount}" class="form-control form-control-sm px-1" placeholder="cm" oninput="calcCBM(${rowCount})"></td>
             <td><input type="number" name="h_${rowCount}" class="form-control form-control-sm px-1" placeholder="cm" oninput="calcCBM(${rowCount})"></td>
             <td>
-                <input type="number" name="cbm_${rowCount}" class="form-control form-control-sm px-1 bg-light" readonly step="0.0001">
+                <input type="number" name="cbm_${rowCount}" class="form-control form-control-sm px-1 bg-white text-dark" readonly step="0.0001">
             </td>
             <td>
                  <input type="number" name="kg_${rowCount}" class="form-control form-control-sm px-1" step="0.01" oninput="updateTotals()">

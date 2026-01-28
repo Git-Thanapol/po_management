@@ -209,7 +209,7 @@ def po_list_view(request):
     status_filter = request.GET.get('status', '')
     
     # Revert to showing Items as per user requirement
-    items = POItem.objects.all().select_related('header', 'sku').order_by('-header__order_date')
+    items = POItem.objects.all().select_related('header', 'sku').prefetch_related('receipts', 'header__attachments').order_by('-header__order_date')
     
     if po_number_query:
         items = items.filter(header__po_number__icontains=po_number_query)
@@ -218,7 +218,32 @@ def po_list_view(request):
         items = items.filter(Q(sku__product_code__icontains=search_query) | Q(sku__name__icontains=search_query))
         
     if status_filter:
-        items = items.filter(header__status=status_filter)
+        if status_filter == 'arriving_soon':
+            # Next 7 days
+            next_week = date.today() + timedelta(days=7)
+            items = items.filter(header__status__in=['Pending'], header__estimated_date__range=[date.today(), next_week])
+        elif status_filter == 'incomplete':
+            # Pending but has received some? Or just Pending?
+            # "สินค้าไม่ครบ" usually means Received Partial.
+            # We need to filter items that have receipts but not complete.
+            # Filtering on property or aggregate is hard without annotation.
+            # Let's assume for now it means "Pending" but we want to differentiate from "Waiting Shipment".
+            # Actually, "Waiting Shipment" (รอจัดส่ง) -> Qty Received = 0
+            # "Incomplete" (สินค้าไม่ครบ) -> Qty Received > 0 but not Complete
+            # Annotating received qty first:
+            from django.db.models import Sum
+            items = items.annotate(received_sum=Sum('receipts__received_qty'))
+            items = items.filter(header__status='Pending', received_sum__gt=0)
+        elif status_filter == 'waiting_shipment':
+            # Pending and No Receipts
+            from django.db.models import Sum
+            items = items.annotate(received_sum=Sum('receipts__received_qty'))
+            items = items.filter(header__status='Pending', received_sum__isnull=True) # or 0
+        elif status_filter == 'overdue':
+            items = items.exclude(header__status='Complete').filter(header__estimated_date__lt=date.today())
+        else:
+            # Match standard status (Pending, Complete)
+            items = items.filter(header__status=status_filter)
         
     # Category Filter
     categories = MasterItem.objects.values_list('category', flat=True).distinct().order_by('category')

@@ -1,5 +1,36 @@
 {% extends 'base.html' %} {% load humanize %} {% block title %}PO Management -
 JST System{% endblock %} {% block content %}
+<!-- Copy Modal -->
+<div class="modal fade" id="copyModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fs-6" id="copyModalTitle">Copy Data</h5>
+        <button
+          type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+          aria-label="Close"
+        ></button>
+      </div>
+      <div class="modal-body text-center">
+        <input
+          type="text"
+          class="form-control mb-2 text-center"
+          id="copyInput"
+          readonly
+        />
+        <button
+          class="btn btn-primary btn-sm w-100"
+          onclick="copyToClipboard()"
+        >
+          <i class="bi bi-clipboard"></i> คัดลอก
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="row mb-4">
   <div class="col-12">
     <h2 class="mb-3">📋 สรุปรายการสั่งซื้อสินค้า</h2>
@@ -33,18 +64,42 @@ JST System{% endblock %} {% block content %}
         <div class="col-md-2">
           <label class="form-label">สถานะ</label>
           <select name="status" class="form-select">
-            <option value="">ทั้งหมด</option>
+            <option value="">ทั้งหมด (All)</option>
             <option
-              value="Pending"
+              value="arriving_soon"
               {%
               if
               status_filter=""
-              ="Pending"
+              ="arriving_soon"
               %}selected{%
               endif
               %}
             >
-              Pending
+              สินค้าใกล้ถึง
+            </option>
+            <option
+              value="waiting_shipment"
+              {%
+              if
+              status_filter=""
+              ="waiting_shipment"
+              %}selected{%
+              endif
+              %}
+            >
+              รอจัดส่ง
+            </option>
+            <option
+              value="incomplete"
+              {%
+              if
+              status_filter=""
+              ="incomplete"
+              %}selected{%
+              endif
+              %}
+            >
+              สินค้าไม่ครบ
             </option>
             <option
               value="Complete"
@@ -56,7 +111,19 @@ JST System{% endblock %} {% block content %}
               endif
               %}
             >
-              Complete
+              เรียบร้อย
+            </option>
+            <option
+              value="overdue"
+              {%
+              if
+              status_filter=""
+              ="overdue"
+              %}selected{%
+              endif
+              %}
+            >
+              เลยกำหนดจัดส่ง
             </option>
           </select>
         </div>
@@ -101,7 +168,7 @@ JST System{% endblock %} {% block content %}
         <div class="table-responsive">
           <table
             class="table table-hover table-striped align-middle mb-0"
-            style="font-size: 0.9rem"
+            style="font-size: 0.85rem"
           >
             <thead class="text-nowrap text-center text-white">
               <tr>
@@ -140,7 +207,11 @@ JST System{% endblock %} {% block content %}
                 <th class="bg-black">TIKTOK</th>
 
                 <th class="bg-dark">หมายเหตุ</th>
-                <th class="bg-dark">attachfile</th>
+
+                <!-- New Columns -->
+                <th class="bg-dark">เอกสารแนบ</th>
+                <th class="bg-dark">ลิงค์ร้านค้า</th>
+                <th class="bg-dark">WeChat / Contact</th>
               </tr>
             </thead>
             <tbody>
@@ -148,7 +219,6 @@ JST System{% endblock %} {% block content %}
               <tr>
                 <!-- Edit -->
                 <td class="text-center">
-                  <!-- Link to PO Detail or Edit -->
                   <a
                     href="{% url 'po_detail' item.header.id %}"
                     class="btn btn-sm btn-outline-warning border-0 p-0 text-warning"
@@ -201,7 +271,7 @@ JST System{% endblock %} {% block content %}
                   </a>
                 </td>
 
-                <!-- Shipping -->
+                <!-- Shipping Type -->
                 <td class="text-center">
                   {{ item.header.get_shipping_type_display|default:"-" }}
                 </td>
@@ -213,16 +283,47 @@ JST System{% endblock %} {% block content %}
                 <td class="text-nowrap">
                   {{ item.header.estimated_date|date:"d/m/Y"|default:"-" }}
                 </td>
-                <td class="text-nowrap">-</td>
-                <!-- Received Date Logic TBD -->
 
-                <!-- Duration -->
-                <td class="text-center">{{ item.duration_days }} วัน</td>
-
-                <!-- Qty -->
-                <td class="text-center fw-bold text-success">
-                  {{ item.total_received_qty }}
+                <!-- History Sub-rows -->
+                <td class="p-0">
+                  <!-- Received Date -->
+                  {% for r in item.receipts.all %}
+                  <div
+                    class="border-bottom px-2 py-1 small text-nowrap text-center"
+                  >
+                    {{ r.received_date|date:"d/m/Y" }}
+                  </div>
+                  {% empty %}
+                  <div class="px-2 py-1 text-center">-</div>
+                  {% endfor %}
                 </td>
+                <td class="p-0">
+                  <!-- Duration (Calculated from Receipt Date - Order Date) -->
+                  {% for r in item.receipts.all %}
+                  <div
+                    class="border-bottom px-2 py-1 small text-center text-muted"
+                  >
+                    {{ r.duration_from_order }} วัน
+                  </div>
+                  {% empty %}
+                  <div class="px-2 py-1 text-center">-</div>
+                  {% endfor %}
+                </td>
+
+                <!-- Received Qty Sub-rows -->
+                <td class="p-0">
+                  {% for r in item.receipts.all %}
+                  <div
+                    class="border-bottom px-2 py-1 small text-center fw-bold text-success"
+                  >
+                    {{ r.received_qty }}
+                  </div>
+                  {% empty %}
+                  <div class="px-2 py-1 text-center text-muted">0</div>
+                  {% endfor %}
+                </td>
+
+                <!-- Ordered -->
                 <td class="text-center fw-bold">{{ item.qty_ordered }}</td>
 
                 <!-- Financials -->
@@ -235,11 +336,11 @@ JST System{% endblock %} {% block content %}
                 <td class="text-end">
                   {{ item.price_baht|floatformat:2|intcomma }}
                 </td>
-
-                <!-- Rates -->
                 <td class="text-center">
                   {{ item.header.exchange_rate|floatformat:2 }}
                 </td>
+
+                <!-- Transport Rate -->
                 <td class="text-center">
                   {% if item.header.shipping_rate_kg > 0 %} {{
                   item.header.shipping_rate_kg|floatformat:2 }} (KG) {% elif
@@ -258,8 +359,6 @@ JST System{% endblock %} {% block content %}
                 <td class="text-end">
                   {{ item.weight|floatformat:2|default:"-" }}
                 </td>
-
-                <!-- Unit Price Yuan -->
                 <td class="text-end">
                   {{ item.unit_price_yuan|floatformat:2 }}
                 </td>
@@ -271,7 +370,7 @@ JST System{% endblock %} {% block content %}
                 <td class="text-end text-primary">
                   {{ item.sku.lazada_price|floatformat:2|default:"0.00" }}
                 </td>
-                <td class="text-end text-dark">
+                <td class="text-end text-white fw-bold">
                   {{ item.sku.tiktok_price|floatformat:2|default:"0.00" }}
                 </td>
 
@@ -279,28 +378,58 @@ JST System{% endblock %} {% block content %}
                 <td>
                   <small
                     class="d-block text-truncate"
-                    style="max-width: 150px"
+                    style="max-width: 100px"
                     title="{{ item.header.note }}"
                   >
                     {{ item.header.note|default:"-" }}
                   </small>
                 </td>
 
-                <!-- Link -->
+                <!-- New Column: Attachments -->
+                <td class="text-center">
+                  {% for att in item.header.attachments.all %} {% if att.file %}
+                  <div>
+                    <a
+                      href="{{ att.file.url }}"
+                      target="_blank"
+                      class="text-decoration-none small text-body"
+                      title="{{ att.filename }}"
+                    >
+                      <i class="bi bi-file-earmark-text"></i> ไฟล์แนบ
+                    </a>
+                  </div>
+                  {% endif %} {% empty %}
+                  <span class="text-muted small">-</span>
+                  {% endfor %}
+                </td>
+
+                <!-- New Column: Shop Link -->
                 <td class="text-center">
                   {% if item.header.link_shop %}
-                  <a
-                    href="{{ item.header.link_shop }}"
-                    target="_blank"
-                    class="text-info"
-                    ><i class="bi bi-link-45deg fs-5"></i
-                  ></a>
+                  <button
+                    class="btn btn-sm btn-outline-info border-0"
+                    onclick="showCopyModal('Link ร้านค้า', '{{ item.header.link_shop|escapejs }}')"
+                  >
+                    <i class="bi bi-shop"></i> Link
+                  </button>
+                  {% else %} - {% endif %}
+                </td>
+
+                <!-- New Column: WeChat / Contact -->
+                <td class="text-center">
+                  {% if item.header.wechat_contact %}
+                  <button
+                    class="btn btn-sm btn-outline-success border-0"
+                    onclick="showCopyModal('WeChat / Contact', '{{ item.header.wechat_contact|escapejs }}')"
+                  >
+                    <i class="bi bi-chat-dots"></i> Contact
+                  </button>
                   {% else %} - {% endif %}
                 </td>
               </tr>
               {% empty %}
               <tr>
-                <td colspan="26" class="text-center py-5 text-muted">
+                <td colspan="29" class="text-center py-5 text-muted">
                   <i class="bi bi-inbox fs-1 d-block mb-3"></i>
                   ไม่พบรายการสั่งซื้อ (No PO Found)
                 </td>
@@ -314,4 +443,29 @@ JST System{% endblock %} {% block content %}
   </div>
 </div>
 
+<script>
+  function showCopyModal(title, text) {
+    document.getElementById("copyModalTitle").textContent = title;
+    document.getElementById("copyInput").value = text;
+    new bootstrap.Modal(document.getElementById("copyModal")).show();
+  }
+
+  function copyToClipboard() {
+    const copyText = document.getElementById("copyInput");
+    copyText.select();
+    copyText.setSelectionRange(0, 99999);
+    navigator.clipboard.writeText(copyText.value);
+
+    // Visual feedback
+    const btn = document.querySelector("#copyModal .btn-primary");
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="bi bi-check"></i> คัดลอกแล้ว';
+    btn.classList.replace("btn-primary", "btn-success");
+
+    setTimeout(() => {
+      btn.innerHTML = originalHtml;
+      btn.classList.replace("btn-success", "btn-primary");
+    }, 1500);
+  }
+</script>
 {% endblock %}
