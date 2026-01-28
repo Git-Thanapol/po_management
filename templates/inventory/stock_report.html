@@ -82,7 +82,18 @@ Summary - JST System{% endblock %} {% block content %}
           />
         </div>
         <div class="col-md-2 d-flex align-items-end">
-          <button type="submit" class="btn btn-primary w-100">ค้นหา</button>
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary flex-grow-1">
+              ค้นหา
+            </button>
+            <button
+              type="submit"
+              form="bulkUpdateForm"
+              class="btn btn-success flex-grow-1"
+            >
+              <i class="bi bi-save"></i> บันทึกจุดเตือน
+            </button>
+          </div>
         </div>
       </form>
     </div>
@@ -155,12 +166,12 @@ Summary - JST System{% endblock %} {% block content %}
                     />
                   </td>
                   <td class="text-center">
-                    {% if "หมด" in item.status %}
-                    <span class="badge rounded-pill bg-danger">หมด</span>
-                    {% elif "ใกล้" in item.status %}
+                    {% if "ใกล้" in item.status %}
                     <span class="badge rounded-pill bg-warning text-dark"
                       >ใกล้หมด</span
                     >
+                    {% elif "หมด" in item.status %}
+                    <span class="badge rounded-pill bg-danger">หมด</span>
                     {% else %}
                     <span class="badge rounded-pill bg-success">ปกติ</span>
                     {% endif %}

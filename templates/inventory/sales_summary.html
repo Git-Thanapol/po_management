@@ -9,81 +9,218 @@
       <h5 class="card-title text-primary">
         <i class="bi bi-funnel"></i> ตัวกรองข้อมูล (Filter)
       </h5>
-      <form method="get" class="row g-3">
-        <div class="col-md-2">
-          <label class="form-label">ปี (Year)</label>
-          <select name="year" class="form-select">
-            {% for y in years %}
-            <option
-              value="{{ y }}"
-              {%
-              if
-              y=""
-              ="selected_year"
-              %}selected{%
-              endif
-              %}
+      <form method="get" class="g-3" id="filterForm">
+        <!-- Row 1: Dates and Category -->
+        <div class="row mb-3">
+          <div class="col-md-2">
+            <label class="form-label fw-bold">📅 ช่วงวันที่ (Date Range)</label>
+            <div class="input-group">
+              <span class="input-group-text">จาก</span>
+              <input
+                type="date"
+                name="start_date"
+                class="form-control"
+                value="{{ start_date }}"
+                onchange="this.form.submit()"
+              />
+            </div>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">&nbsp;</label>
+            <div class="input-group">
+              <span class="input-group-text">ถึง</span>
+              <input
+                type="date"
+                name="end_date"
+                class="form-control"
+                value="{{ end_date }}"
+                onchange="this.form.submit()"
+              />
+            </div>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fw-bold">📂 หมวดหมู่สินค้า</label>
+            <select
+              name="category"
+              class="form-select"
+              onchange="this.form.submit()"
             >
-              {{ y }}
-            </option>
-            {% endfor %}
-          </select>
+              <option
+                value=""
+                {%
+                if
+                not
+                selected_category
+                %}selected{%
+                endif
+                %}
+              >
+                -- แสดงทั้งหมด --
+              </option>
+              {% for cat in categories %} {% if cat %}
+              <option
+                value="{{ cat }}"
+                {%
+                if
+                cat=""
+                ="selected_category"
+                %}selected{%
+                endif
+                %}
+              >
+                {{ cat }}
+              </option>
+              {% endif %} {% endfor %}
+            </select>
+          </div>
         </div>
-        <div class="col-md-2">
-          <label class="form-label">เดือน (Month)</label>
-          <select name="month" class="form-select">
-            {% for m_idx, m_name in thai_months %}
-            <option
-              value="{{ m_idx }}"
-              {%
-              if
-              m_idx=""
-              ="selected_month"
-              %}selected{%
-              endif
-              %}
+
+        <!-- Row 2: Mode and Search -->
+        <div class="row">
+          <!-- Filter Mode -->
+          <div class="col-md-4">
+            <label class="form-label fw-bold"
+              >🎯 โหมดการแสดงผล (Filter Mode)</label
             >
-              {{ m_name }}
-            </option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="col-md-2">
-          <label class="form-label">หมวดหมู่สินค้า</label>
-          <select name="category" class="form-select">
-            <option value="" {% if not selected_category %}selected{% endif %}>
-              แสดงทั้งหมด
-            </option>
-            {% for cat in categories %} {% if cat %}
-            <option
-              value="{{ cat }}"
-              {%
-              if
-              cat=""
-              ="selected_category"
-              %}selected{%
-              endif
-              %}
-            >
-              {{ cat }}
-            </option>
-            {% endif %} {% endfor %}
-          </select>
-        </div>
-        <div class="col-md-3">
-          <label class="form-label">ค้นหา (SKU/Name)</label>
-          <input
-            type="text"
-            name="search"
-            class="form-control"
-            value="{{ search_query }}"
-            placeholder="รหัส หรือ ชื่อสินค้า..."
-          />
-        </div>
-        <div class="col-md-2 d-flex align-items-end">
-          <button type="submit" class="btn btn-primary w-100">
-            <i class="bi bi-search"></i> ค้นหา
-          </button>
+            <div class="card bg-dark border-secondary p-2">
+              <div class="btn-group w-100" role="group">
+                <input
+                  type="radio"
+                  class="btn-check"
+                  name="filter_mode"
+                  id="modeGeneral"
+                  value="general"
+                  {%
+                  if
+                  filter_mode=""
+                  ="general"
+                  %}checked{%
+                  endif
+                  %}
+                  onchange="
+                    toggleFilterMode();
+                    this.form.submit();
+                  "
+                />
+                <label class="btn btn-outline-info" for="modeGeneral"
+                  >ทั่วไป (Movement)</label
+                >
+
+                <input
+                  type="radio"
+                  class="btn-check"
+                  name="filter_mode"
+                  id="modeFocus"
+                  value="focus"
+                  {%
+                  if
+                  filter_mode=""
+                  ="focus"
+                  %}checked{%
+                  endif
+                  %}
+                  onchange="
+                    toggleFilterMode();
+                    this.form.submit();
+                  "
+                />
+                <label class="btn btn-outline-warning" for="modeFocus"
+                  >เจาะจงวันที่ (Focus Date)</label
+                >
+              </div>
+
+              <!-- Mode Content -->
+              <div class="mt-2">
+                <!-- General: Movement -->
+                <div
+                  id="generalFilterGroup"
+                  style="display: {% if filter_mode == 'general' %}block{% else %}none{% endif %};"
+                >
+                  <select
+                    name="movement"
+                    class="form-select form-select-sm"
+                    onchange="this.form.submit()"
+                  >
+                    <option
+                      value="all"
+                      {%
+                      if
+                      movement_filter=""
+                      ="all"
+                      %}selected{%
+                      endif
+                      %}
+                    >
+                      แสดงสินค้าทั้งหมด
+                    </option>
+                    <option
+                      value="active"
+                      {%
+                      if
+                      movement_filter=""
+                      ="active"
+                      %}selected{%
+                      endif
+                      %}
+                    >
+                      🟢 เฉพาะที่มีการเคลื่อนไหว
+                    </option>
+                    <option
+                      value="inactive"
+                      {%
+                      if
+                      movement_filter=""
+                      ="inactive"
+                      %}selected{%
+                      endif
+                      %}
+                    >
+                      🔴 เฉพาะที่ไม่มีการเคลื่อนไหว
+                    </option>
+                  </select>
+                </div>
+
+                <!-- Focus: Date Picker -->
+                <div
+                  id="focusFilterGroup"
+                  style="display: {% if filter_mode == 'focus' %}block{% else %}none{% endif %};"
+                >
+                  <div class="input-group input-group-sm">
+                    <span class="input-group-text">วันที่สนใจ</span>
+                    <input
+                      type="date"
+                      name="focus_date"
+                      class="form-control"
+                      value="{{ focus_date }}"
+                      onchange="this.form.submit()"
+                    />
+                  </div>
+                  <div class="form-text small text-muted mt-1">
+                    * แสดงเฉพาะสินค้าที่มียอดขายในวันที่เลือก
+                    (แต่โชว์ยอดขายตามช่วงวันที่ด้านบน)
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Search -->
+          <div class="col-md-2">
+            <label class="form-label fw-bold">🔍 ค้นหา</label>
+            <div class="input-group">
+              <input
+                type="text"
+                name="search"
+                class="form-control"
+                value="{{ search_query }}"
+                placeholder="รหัส หรือ ชื่อสินค้า..."
+                onchange="this.form.submit()"
+              />
+              <button type="submit" class="btn btn-primary">
+                <i class="bi bi-search"></i>
+              </button>
+            </div>
+          </div>
         </div>
       </form>
     </div>
@@ -99,9 +236,15 @@
                 <th>รหัสสินค้า</th>
                 <th>รูป</th>
                 <th>ชื่อสินค้า</th>
-                <th class="text-end">ยอดขาย (ชิ้น)</th>
-                <th class="text-end">ยอดขาย (฿)</th>
                 <th class="text-end">คงเหลือ</th>
+                <th class="text-end">ยอดรวม</th>
+                <th class="text-center">สถานะ</th>
+                <!-- Daily Columns Headers -->
+                {% for d_header in date_headers %}
+                <th class="text-center small" style="min-width: 50px">
+                  {{ d_header }}
+                </th>
+                {% endfor %}
               </tr>
             </thead>
             <tbody>
@@ -128,20 +271,48 @@
                   <span class="text-muted small">No Img</span>
                   {% endif %}
                 </td>
-                <td>{{ item.name|truncatechars:40 }}</td>
-                <td class="text-end fw-bold text-success">
-                  {{ item.period_qty|intcomma }}
-                </td>
-                <td class="text-end text-primary fw-bold">
-                  {{ item.period_amount|floatformat:2|intcomma }}
+                <td>
+                  <div
+                    class="text-truncate"
+                    style="max-width: 200px"
+                    title="{{ item.name }}"
+                  >
+                    {{ item.name }}
+                  </div>
                 </td>
                 <td class="text-end text-muted">
                   {{ item.current_stock|intcomma }}
                 </td>
+                <td class="text-end fw-bold text-success">
+                  {{ item.period_qty|intcomma }}
+                </td>
+                <td class="text-center">
+                  {% if item.current_stock <= 0 %}
+                  <span class="badge bg-danger rounded-pill">หมด</span>
+                  {% elif item.current_stock <= item.min_limit %}
+                  <span class="badge bg-warning text-dark rounded-pill"
+                    >ใกล้หมด</span
+                  >
+                  {% else %}
+                  <span class="badge bg-success rounded-pill">ปกติ</span>
+                  {% endif %}
+                </td>
+
+                <!-- Daily Sales Data -->
+                {% for qty in item.daily_sales %}
+                <td
+                  class="text-center small {% if qty > 0 %}fw-bold text-primary{% else %}text-muted{% endif %}"
+                >
+                  {{ qty }}
+                </td>
+                {% endfor %}
               </tr>
               {% empty %}
               <tr>
-                <td colspan="7" class="text-center py-4 text-muted">
+                <td
+                  colspan="{{ date_headers|length|add:7 }}"
+                  class="text-center py-4 text-muted"
+                >
                   ไม่พบข้อมูลสินค้า
                 </td>
               </tr>
@@ -153,7 +324,7 @@
                 <td class="text-end text-primary">
                   {{ total_period_sales|floatformat:2|intcomma }} ฿
                 </td>
-                <td></td>
+                <td colspan="{{ date_headers|length|add:1 }}"></td>
               </tr>
             </tfoot>
           </table>
@@ -224,6 +395,16 @@
           error +
           "</div>";
       });
+  }
+
+  function toggleFilterMode() {
+    const isGeneral = document.getElementById("modeGeneral").checked;
+    document.getElementById("generalFilterGroup").style.display = isGeneral
+      ? "block"
+      : "none";
+    document.getElementById("focusFilterGroup").style.display = isGeneral
+      ? "none"
+      : "block";
   }
 </script>
 {% endblock %}

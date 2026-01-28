@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.db.models import Sum, F, Q, DecimalField
 from django.db.models.functions import Coalesce
 from django.views.decorators.http import require_POST
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 # Import Models and Utils
 from .models import MasterItem, Sale, POHeader, POItem, ReceivedPOItem, JSTStockSnapshot
@@ -381,64 +381,146 @@ def logout_view(request):
     messages.info(request, "ออกจากระบบแล้ว")
     return redirect('login')
 
+@login_required
 def daily_sales_view(request):
-    # Filters
+    # Standard Date Handling
+    today = date.today()
+    default_end = today + timedelta(days=30)
+    
+    start_date_str = request.GET.get('start_date')
+    end_date_str = request.GET.get('end_date')
+    
+    # Parse dates or use defaults
     try:
-        current_year = int(request.GET.get('year', datetime.now().year))
-        current_month = int(request.GET.get('month', datetime.now().month))
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date() if start_date_str else today
     except ValueError:
-        current_year = datetime.now().year
-        current_month = datetime.now().month
+        start_date = today
+
+    try:
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date() if end_date_str else default_end
+    except ValueError:
+        end_date = default_end
         
     search_query = request.GET.get('search', '').strip()
     
-    # Date Range for Month
-    import calendar
-    _, last_day = calendar.monthrange(current_year, current_month)
-    start_date = date(current_year, current_month, 1)
-    end_date = date(current_year, current_month, last_day)
+    # Filter Modes
+    filter_mode = request.GET.get('filter_mode', 'general') # general, focus
+    movement_filter = request.GET.get('movement', 'all') # all, active, inactive
+    focus_date_str = request.GET.get('focus_date', '')
     
-    # Query MasterItems annotated with Sales
+    focus_date = None
+    if focus_date_str:
+        try:
+            focus_date = datetime.strptime(focus_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            pass
+
+    # 1. Base Product Query
     products = MasterItem.objects.all().order_by('product_code')
-    
+
     if search_query:
         products = products.filter(Q(product_code__icontains=search_query) | Q(name__icontains=search_query))
 
     # Category Filter
     categories = MasterItem.objects.values_list('category', flat=True).distinct().order_by('category')
-    selected_category = request.GET.get('category', '')
+    selected_category = request.GET.get('category', '').strip()
     if selected_category:
         products = products.filter(category=selected_category)
         
+    # 2. Annotate Total Period Sales/Qty
     products = products.annotate(
         period_qty=Coalesce(Sum('sale__qty', filter=Q(sale__date__range=(start_date, end_date))), 0),
         period_amount=Coalesce(Sum('sale__total_price', filter=Q(sale__date__range=(start_date, end_date))), 0, output_field=DecimalField())
-    ).order_by('-period_qty') # Best sellers first
+    )
+
+    # 3. Apply Filters based on Mode
+    if filter_mode == 'focus' and focus_date:
+        # Focus Mode: Filter products that have ANY sale on the specific focus date
+        # Use distinct() to avoid duplicates if multiple sales occur on that date
+        products = products.filter(sale__date=focus_date).distinct()
+        
+    else:
+        # General Mode: Apply Movement Filter
+        if movement_filter == 'active': # "มีการเคลื่อนไหว"
+            products = products.filter(period_qty__gt=0)
+        elif movement_filter == 'inactive': # "ไม่มีการเคลื่อนไหว"
+            products = products.filter(period_qty=0)
     
-    # Context Data
-    years = range(datetime.now().year, datetime.now().year - 5, -1)
-    thai_months = [
-        (1, 'มกราคม'), (2, 'กุมภาพันธ์'), (3, 'มีนาคม'), (4, 'เมษายน'),
-        (5, 'พฤษภาคม'), (6, 'มิถุนายน'), (7, 'กรกฎาคม'), (8, 'สิงหาคม'),
-        (9, 'กันยายน'), (10, 'ตุลาคม'), (11, 'พฤศจิกายน'), (12, 'ธันวาคม')
-    ]
+    # 4. Fetch Daily Sales Breakdown (Optimization)
+    # Get all sales within the range for the filtered products
+    # To avoid N+1, we fetch all relevant sales and map them in Python
+    # Need to execute the product query first to get IDs? 
+    # Or just filter Sales by the same criteria? Filtering sales by product criteria is complex if search/category involved.
+    # Simple approach: Fetch sales for ALL products (or use product__in if list is small, but list might be large).
+    # Better: Fetch sales joined with product filters.
     
+    sales_qs = Sale.objects.filter(
+        date__range=(start_date, end_date)
+    ).values('sku_id', 'date', 'qty')
+    
+    if search_query:
+        sales_qs = sales_qs.filter(Q(sku__product_code__icontains=search_query) | Q(sku__name__icontains=search_query))
+    if selected_category:
+        sales_qs = sales_qs.filter(sku__category=selected_category)
+        
+    # Build Sales Map: sales_map[product_id][date_obj] = qty
+    sales_map = {}
+    for entry in sales_qs:
+        p_id = entry['sku_id']
+        d = entry['date']
+        q = entry['qty']
+        
+        if p_id not in sales_map:
+            sales_map[p_id] = {}
+        
+        # Sales might appear multiple times per day if multiple Sale records?
+        # values('sku_id', 'date', 'qty') doesn't sum if not annotated.
+        # correctly: .values('sku_id', 'date').annotate(total_qty=Sum('qty'))
+        # But for now let's just sum it up here to be safe or fix the query.
+        sales_map[p_id][d] = sales_map[p_id].get(d, 0) + q
+
+    # 5. Generate Date Columns
+    date_columns = []
+    curr = start_date
+    while curr <= end_date:
+        date_columns.append(curr)
+        curr += timedelta(days=1)
+        
+    # 6. Attach Daily Sales List to Products
+    # We need to evaluate the products queryset now
+    products = list(products) # Hit DB
+    
+    for p in products:
+        p.daily_sales = []
+        p_sales = sales_map.get(p.pk, {})
+        for d in date_columns:
+            qty = p_sales.get(d, 0)
+            p.daily_sales.append(qty)
+            
+    # Thai Date Headers
+    thai_months_abbr = ["", "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."]
+    date_headers = []
+    for d in date_columns:
+        # e.g. "1 ม.ค."
+        date_headers.append(f"{d.day} {thai_months_abbr[d.month]}")
+
     context = {
         'products': products,
-        'years': years,
-        'thai_months': thai_months,
-        'selected_year': current_year,
-        'selected_month': current_month,
-        'selected_year': current_year,
-        'selected_month': current_month,
+        'start_date': start_date.strftime('%Y-%m-%d'),
+        'end_date': end_date.strftime('%Y-%m-%d'),
+        'date_headers': date_headers,
         'search_query': search_query,
         'categories': categories,
         'selected_category': selected_category,
-        'total_period_sales': products.aggregate(Sum('period_amount'))['period_amount__sum'] or 0,
+        'movement_filter': movement_filter,
+        'filter_mode': filter_mode,
+        'focus_date': focus_date_str,
+        'total_period_sales': sum(p.period_amount for p in products), # Calculate explicitly since queryset was evaluated
     }
     
     return render(request, 'inventory/sales_summary.html', context)
 
+@login_required
 def stock_report_view(request):
     search_query = request.GET.get('search', '').strip()
     status_filter = request.GET.get('status', '')

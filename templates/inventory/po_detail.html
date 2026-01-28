@@ -486,22 +486,54 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
       <div class="table-responsive">
         <table class="table table-dark table-hover align-middle mb-0">
           <thead>
-            <tr>
-              <th style="width: 40px">
+            <tr class="text-center align-middle">
+              <th rowspan="2" style="width: 40px">
                 <input type="checkbox" id="selectAll" />
               </th>
-              <th style="width: 60px">Img</th>
-              <th>SKU / Name</th>
-              <th class="text-center">สั่งซื้อ</th>
-              <th class="text-center text-success">รับแล้ว</th>
-              <th class="text-center">ค้างรับ</th>
-              <th style="width: 100px" class="text-center">
-                รับครั้งนี้ (Qty)
+              <th rowspan="2" style="width: 60px">รูปสินค้า</th>
+              <th rowspan="2">SKU / Name</th>
+              <th rowspan="2" class="text-end">ราคา (¥)</th>
+              <th rowspan="2" class="text-end">รวม (฿)</th>
+
+              <!-- Ordered Group -->
+              <th
+                colspan="3"
+                class="bg-success text-white border-bottom border-light"
+              >
+                Ordered (สั่งซื้อ)
               </th>
-              <th style="width: 100px" class="text-center">CBM</th>
-              <th style="width: 100px" class="text-center">Weight</th>
-              <th class="text-end">ราคา (¥)</th>
-              <th class="text-end">รวม (฿)</th>
+
+              <!-- Received Group -->
+              <th
+                colspan="3"
+                class="bg-info text-dark border-bottom border-light"
+              >
+                Received (รับแล้ว)
+              </th>
+
+              <!-- Input Group -->
+              <th
+                colspan="3"
+                class="bg-dark text-white border-bottom border-light"
+              >
+                Receive Now (รับครั้งนี้)
+              </th>
+            </tr>
+            <tr class="text-center small">
+              <!-- Ordered Subcols -->
+              <th class="bg-success text-white" style="width: 90px">Qty</th>
+              <th class="bg-success text-white" style="width: 90px">CBM</th>
+              <th class="bg-success text-white" style="width: 90px">Kg</th>
+
+              <!-- Received Subcols -->
+              <th class="bg-info text-dark" style="width: 90px">Qty</th>
+              <th class="bg-info text-dark" style="width: 90px">CBM</th>
+              <th class="bg-info text-dark" style="width: 90px">Kg</th>
+
+              <!-- Input Subcols -->
+              <th class="bg-dark text-white" style="width: 90px">Qty</th>
+              <th class="bg-dark text-white" style="width: 90px">CBM</th>
+              <th class="bg-dark text-white" style="width: 90px">Kg</th>
             </tr>
           </thead>
           <tbody>
@@ -523,57 +555,78 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
                 {% if item.sku.image %}
                 <img
                   src="{{ item.sku.image.url }}"
-                  style="height: 40px"
+                  style="height: 60px"
                   class="rounded"
                 />
                 {% endif %}
               </td>
-              <td>
+              <td class="text-center">
                 <div class="fw-bold">{{ item.sku.product_code }}</div>
                 <div class="small text-muted">
                   {{ item.sku.name|truncatechars:30 }}
                 </div>
               </td>
-              <td class="text-center fw-bold">{{ item.qty_ordered }}</td>
-              <td class="text-center text-success">
-                {{ item.total_received_qty }}
+              <td class="text-end">{{ item.price_yuan }}</td>
+              <td class="text-end">{{ item.price_baht|intcomma }}</td>
+
+              <!-- Ordered Data -->
+              <!-- Ordered Data -->
+              <td class="text-center bg-success bg-opacity-25">
+                {{ item.qty_ordered|intcomma }}
               </td>
-              <td class="text-center text-warning">{{ item.remaining_qty }}</td>
-              <td>
+              <td class="text-center bg-success bg-opacity-25">
+                {{ item.cbm|floatformat:4|default_if_none:"-" }}
+              </td>
+              <td class="text-center bg-success bg-opacity-25">
+                {{ item.weight|floatformat:2|default_if_none:"-" }}
+              </td>
+
+              <!-- Received Data -->
+              <!-- Received Data -->
+              <td class="text-center bg-info bg-opacity-25 fw-bold">
+                {{ item.total_received_qty|intcomma }}
+              </td>
+              <td class="text-center bg-info bg-opacity-25">
+                {{ item.total_received_cbm|floatformat:4|default_if_none:"-" }}
+              </td>
+              <td class="text-center bg-info bg-opacity-25">
+                {{ item.total_received_weight|floatformat:2|default_if_none:"-" }}
+              </td>
+
+              <!-- Input Data -->
+              <td class="bg-secondary bg-opacity-25" style="width: 90px">
                 {% if item.qty_ordered > item.total_received_qty %}
                 <input
                   type="number"
                   name="receive_qty_{{ item.id }}"
                   id="qty_{{ item.id }}"
-                  class="form-control form-control-sm bg-secondary text-white border-secondary text-center"
+                  class="form-control form-control-sm bg-dark text-white border-secondary text-center"
                   data-remaining="{{ item.remaining_qty }}"
                   oninput="onInputChange('{{ item.id }}')"
                   placeholder="0"
                 />
                 {% else %}
-                <span class="badge bg-success">✓</span>
+                <span class="badge bg-success w-100">Complete</span>
                 {% endif %}
               </td>
-              <td>
+              <td class="bg-secondary bg-opacity-25">
                 <input
                   type="number"
-                  step="0.01"
+                  step="0.0001"
                   name="receive_cbm_{{ item.id }}"
-                  class="form-control form-control-sm bg-secondary text-white border-secondary text-center"
+                  class="form-control form-control-sm bg-dark text-white border-secondary text-center"
                   placeholder="0"
                 />
               </td>
-              <td>
+              <td class="bg-secondary bg-opacity-25">
                 <input
                   type="number"
                   step="0.01"
                   name="receive_weight_{{ item.id }}"
-                  class="form-control form-control-sm bg-secondary text-white border-secondary text-center"
+                  class="form-control form-control-sm bg-dark text-white border-secondary text-center"
                   placeholder="0"
                 />
               </td>
-              <td class="text-end">{{ item.price_yuan }}</td>
-              <td class="text-end">{{ item.price_baht|intcomma }}</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -665,7 +718,7 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
             <tbody></tbody>
             <tbody>
               {% for item in po.items.all %} 
-	             {% for receipt in item.receipts.all %}
+		{% for receipt in item.receipts.all %}
               <tr>
                 <td>{{ receipt.received_date|date:"d/m/Y" }}</td>
                 <td class="fw-bold">{{ item.sku.product_code }}</td>
@@ -678,8 +731,8 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
                   {{ receipt.received_weight|floatformat:2 }}
                 </td>
               </tr>
-              	{% endfor %} 
-	              {% endfor %}
+              {% endfor %} 
+		{% endfor %}
             </tbody>
           </table>
         </div>
