@@ -341,8 +341,8 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
                 target="_blank"
                 class="badge bg-secondary text-decoration-none"
               >
-                <i class="bi bi-paperclip"></i> {{
-                file.filename|truncatechars:15 }}
+                <i class="bi bi-paperclip"></i> 
+		{{ file.filename|truncatechars:15 }}
               </a>
               {% endfor %}
             </div>
