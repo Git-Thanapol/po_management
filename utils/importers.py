@@ -81,45 +81,113 @@ class ImportService:
         
         results = {"success": 0, "failed": 0, "errors": []}
 
-        # Helper to get value from multiple possible keys
-        def get_val(row, keys, default=None):
-            for key in keys:
-                if key in row and pd.notna(row[key]):
-                    return row[key]
-            return default
+        # --- helper to find col ---
+        def get_col(df, candidates):
+            for c in candidates:
+                if c in df.columns: return c
+            return None
+
+        col_order_id = get_col(df, ['หมายเลขคำสั่งซื้อออนไลน์', 'Order ID', 'หมายเลขออเดอร์ภายใน'])
+        col_sku = get_col(df, ['รหัสสินค้า', 'SKU'])
+        col_qty = get_col(df, ['จำนวน', 'Quantity'])
+        col_total_price = get_col(df, ['รายละเอียดยอดที่ชำระแล้ว', 'Total Price', 'ยอดขาย Upsell'])
+        col_unit_price = get_col(df, ['ราคาต่อชิ้น', 'Unit Price'])
+        col_status = get_col(df, ['สถานะคำสั่งซื้อ', 'Status'])
+        col_platform = get_col(df, ['แพลตฟอร์ม', 'Platform'])
+        col_date = get_col(df, ['เวลาสั่งซื้อ', 'Date'])
+        col_shop = get_col(df, ['ร้านค้า', 'Shop Name'])
+
+        if not col_order_id or not col_sku:
+             results['errors'].append("Missing critical columns (Order ID or SKU)")
+             return results
+
+        # Normalize Data Phase
+        # We build a standard list of dicts to process
+        processed_data = []
 
         for index, row in df.iterrows():
             try:
-                # Map columns (Thai/English)
-                order_id = str(get_val(row, ['หมายเลขคำสั่งซื้อออนไลน์', 'Order ID', 'หมายเลขออเดอร์ภายใน'], '')).strip()
-                sku_code = str(get_val(row, ['รหัสสินค้า', 'SKU'], '')).strip()
-                
-                if not order_id or not sku_code:
+                # 1. Status Check & Filter
+                status = str(row[col_status]) if col_status and pd.notna(row[col_status]) else 'Completed'
+                if status.strip() == 'ยกเลิก':
+                    # Check delete logic if needed, but for aggregation we just skip first?
+                    # If we skip, we don't aggregate.
+                    # BUT: If DB has it, we must delete it.
+                    # Complexity: We need to know 'Did we delete this OrderID/SKU combination?'
+                    # We can do a bulk delete cleanup for all 'ยกเลิก' rows found?
+                    
+                    oid = str(row[col_order_id]).strip()
+                    sk = str(row[col_sku]).strip()
+                    # Try to find MasterItem just to identify the key for deletion
+                    # (Performance hit but safer)
+                    try:
+                        m_item = MasterItem.objects.get(product_code=sk)
+                        Sale.objects.filter(order_id=oid, sku=m_item).delete()
+                    except:
+                        pass # SKU doesn't exist, so Sale can't exist
                     continue
+
+                processed_data.append({
+                    'order_id': str(row[col_order_id]).strip(),
+                    'sku_code': str(row[col_sku]).strip(),
+                    'qty': int(row[col_qty]) if col_qty and pd.notna(row[col_qty]) else 0,
+                    'total_price': float(row[col_total_price]) if col_total_price and pd.notna(row[col_total_price]) else 0,
+                    'unit_price': float(row[col_unit_price]) if col_unit_price and pd.notna(row[col_unit_price]) else 0,
+                    'status': status,
+                    'platform': str(row[col_platform]) if col_platform and pd.notna(row[col_platform]) else 'Shopee',
+                    'date': row[col_date] if col_date and pd.notna(row[col_date]) else datetime.today(),
+                    'shop_name': str(row[col_shop]) if col_shop and pd.notna(row[col_shop]) else '',
+                    'orig_index': index
+                })
+            except Exception as e:
+                results['errors'].append(f"Row {index} parsing error: {e}")
+
+        # Convert to DF for Aggregation
+        if not processed_data:
+            return results
+
+        df_clean = pd.DataFrame(processed_data)
+        
+        # Aggregate duplicates (Order ID + SKU)
+        # Sum: qty, total_price
+        # First: status, platform, date, shop_name, unit_price (calculated later)
+        
+        agg_rules = {
+            'qty': 'sum',
+            'total_price': 'sum',
+            'status': 'first',
+            'platform': 'first',
+            'date': 'first',
+            'shop_name': 'first',
+            'unit_price': 'first' # We take first, or recalc? Recalc is better.
+        }
+        
+        df_grouped = df_clean.groupby(['order_id', 'sku_code'], as_index=False).agg(agg_rules)
+
+        # Import Phase
+        for index, row in df_grouped.iterrows():
+            try:
+                order_id = row['order_id']
+                sku_code = row['sku_code']
                 
-                # Try to get MasterItem
+                if not order_id or not sku_code: continue
+
+                # Get/Create Master Item
                 try:
                     master_item = MasterItem.objects.get(product_code=sku_code)
                 except MasterItem.DoesNotExist:
                     results["failed"] += 1
-                    # Auto-create if missing to allow import? 
-                    # Providing a fallback/unknown item is better than blocking if allowed. 
-                    # For now, just create as Unknown to let user fix later or use dummy.
+                    # Auto-create unknown
                     master_item = MasterItem.objects.create(product_code=sku_code, name=f"Unknown {sku_code}")
+
+                qty = row['qty']
+                total_price = row['total_price']
                 
-                # Data Extraction
-                qty = int(get_val(row, ['จำนวน', 'Quantity'], 0))
-                total_price = float(get_val(row, ['รายละเอียดยอดที่ชำระแล้ว', 'Total Price', 'ยอดขาย Upsell'], 0))
-                unit_price = float(get_val(row, ['ราคาต่อชิ้น', 'Unit Price'], 0))
-                
-                # Calc Unit Price if missing
-                if unit_price == 0 and qty > 0:
+                # Recalculate Unit Price from aggregated totals to be safe
+                if qty > 0:
                     unit_price = total_price / qty
-                    
-                status = get_val(row, ['สถานะคำสั่งซื้อ', 'Status'], 'Completed')
-                platform = get_val(row, ['แพลตฟอร์ม', 'Platform'], 'Shopee')
-                date_val = get_val(row, ['เวลาสั่งซื้อ', 'Date'], datetime.today())
-                shop_name = get_val(row, ['ร้านค้า', 'Shop Name'], '')
+                else:
+                    unit_price = row['unit_price']
 
                 sale, created = Sale.objects.get_or_create(
                     order_id=order_id,
@@ -128,22 +196,29 @@ class ImportService:
                         'qty': qty,
                         'price': unit_price,
                         'total_price': total_price,
-                        'net_price': total_price, # Default net to total if no fee info
-                        'status': status,
-                        'platform': platform,
-                        'date': date_val,
-                        'shop_name': shop_name,
+                        'net_price': total_price,
+                        'status': row['status'],
+                        'platform': row['platform'],
+                        'date': row['date'],
+                        'shop_name': row['shop_name'],
                     }
                 )
-                
+
                 if not created:
-                     pass
+                    # Update existing record with aggregated values
+                    sale.qty = qty
+                    sale.total_price = total_price
+                    sale.price = unit_price
+                    sale.net_price = total_price
+                    sale.status = row['status']
+                    sale.save()
                 
                 results["success"] += 1
+
             except Exception as e:
                 results["failed"] += 1
-                results["errors"].append(f"Row {index}: {e}")
-        
+                results["errors"].append(f"Grouped Item {row.get('order_id')}: {e}")
+
         return results
 
     @staticmethod

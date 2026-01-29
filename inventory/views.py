@@ -18,6 +18,7 @@ from utils.stock_calculator import StockService
 import os
 import json
 import threading
+from decimal import Decimal
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 # ... other imports
@@ -291,13 +292,24 @@ def po_detail_view(request, po_id):
                 else:
                     po.estimated_date = None
 
-                po.order_type = request.POST.get('order_type')
-                po.shipping_type = request.POST.get('shipping_type')
+                if request.POST.get('order_type'):
+                    po.order_type = request.POST.get('order_type')
                 
-                po.exchange_rate = float(request.POST.get('exchange_rate', 1.0) or 1.0)
-                po.shipping_cost_baht = float(request.POST.get('shipping_cost_baht', 0) or 0)
-                po.shipping_rate_kg = float(request.POST.get('shipping_rate_kg', 0) or 0)
-                # po.shipping_rate_cbm = float(request.POST.get('shipping_rate_cbm', 0) or 0) # Deprecated
+                if request.POST.get('shipping_type'):
+                    po.shipping_type = request.POST.get('shipping_type')
+                
+                # Check presence before converting for numeric fields that might be disabled
+                if 'exchange_rate' in request.POST:
+                    po.exchange_rate = float(request.POST.get('exchange_rate', 1.0) or 1.0)
+                
+                if 'shipping_cost_baht' in request.POST:
+                    po.shipping_cost_baht = float(request.POST.get('shipping_cost_baht', 0) or 0)
+                
+                if 'shipping_rate_kg' in request.POST:
+                    po.shipping_rate_kg = float(request.POST.get('shipping_rate_kg', 0) or 0)
+                
+                # Deprecated cbm rate
+                # po.shipping_rate_cbm = ...
                 
                 # New Fields
                 po.shipping_rate_yuan_per_cbm = float(request.POST.get('shipping_rate_yuan_per_cbm', 0) or 0)
@@ -324,9 +336,13 @@ def po_detail_view(request, po_id):
             except Exception as e:
                 messages.error(request, f"Error: {e}")
                 
-        elif action == 'receive_items':
-            # Bulk Receive with Qty, CBM, Weight support
-            count = 0
+
+
+        elif action == 'update_items':
+            # Combined Logic: Update Info AND Receive Items
+            count_update = 0
+            count_receive = 0
+            
             receive_date_str = request.POST.get('receive_date')
             if not receive_date_str:
                 receive_date = date.today()
@@ -334,42 +350,80 @@ def po_detail_view(request, po_id):
                 receive_date = receive_date_str
 
             for key, value in request.POST.items():
-                if key.startswith('receive_qty_'):
+                # 1. Update Logic
+                if key.startswith('qty_ordered_'):
                     try:
-                        # Extract Item ID
                         item_id = key.split('_')[2]
+                        qty = int(value)
+                        cbm = Decimal(request.POST.get(f'cbm_{item_id}', 0) or 0)
+                        weight = Decimal(request.POST.get(f'weight_{item_id}', 0) or 0)
                         
-                        # Get Values (Qty, CBM, Weight)
-                        qty = int(value) if value else 0
-                        cbm = float(request.POST.get(f'receive_cbm_{item_id}', 0) or 0)
-                        weight = float(request.POST.get(f'receive_weight_{item_id}', 0) or 0)
+                        item = POItem.objects.get(id=item_id, header=po)
+                        item.qty_ordered = qty
+                        item.cbm = cbm
+                        item.weight = weight
+                        item.save()
+                        count_update += 1
+                    except Exception as e:
+                        print(f"Error updating item {key}: {e}")
+
+                # 2. Receive Logic
+                elif key.startswith('receive_qty_'):
+                    try:
+                        item_id_recv = key.split('_')[2]
+                        qty_recv = int(value) if value else 0
                         
-                        if qty > 0 or cbm > 0 or weight > 0:
-                            item = POItem.objects.get(id=item_id, header=po)
+                        if qty_recv > 0:
+                            item = POItem.objects.get(id=item_id_recv, header=po)
+                            cbm_recv = Decimal(request.POST.get(f'receive_cbm_{item_id_recv}', 0) or 0)
+                            weight_recv = Decimal(request.POST.get(f'receive_weight_{item_id_recv}', 0) or 0)
                             
-                            # Create Receipt
                             ReceivedPOItem.objects.create(
                                 po_item=item,
-                                received_qty=qty,
-                                received_cbm=cbm,
-                                received_weight=weight,
+                                received_qty=qty_recv,
+                                received_cbm=cbm_recv,
+                                received_weight=weight_recv,
                                 received_date=receive_date
                             )
-                            count += 1
+                            count_receive += 1
                     except Exception as e:
                         print(f"Error receiving item {key}: {e}")
-                        messages.warning(request, f"Error receiving item {key}: {e}")
-                        continue
-            
-            if count > 0:
-                messages.success(request, f"✅ รับสินค้าเรียบร้อย {count} รายการ")
-            else:
-                messages.warning(request, "⚠️ ไม่มีการรับสินค้า (ตรวจสอบจำนวนที่ระบุ)")
+            messages.success(request, f"✅ บันทึกข้อมูลสำเร็จ (แก้ไข: {count_update}, รับเข้า: {count_receive})")
+            return redirect('po_detail', po_id=po.id)
+
+        elif action == 'add_item':
+            sku_code = request.POST.get('sku_code')
+            if sku_code:
+                try:
+                    # Get SKU
+                    sku = MasterItem.objects.get(product_code=sku_code.strip())
+                    
+                    POItem.objects.create(
+                        header=po,
+                        sku=sku,
+                        qty_ordered=int(request.POST.get('new_qty', 1)),
+                        cbm=Decimal(request.POST.get('new_cbm', 0) or 0),
+                        weight=Decimal(request.POST.get('new_weight', 0) or 0),
+                        price_yuan=Decimal(request.POST.get('new_price_yuan', 0) or 0)
+                    )
+                    messages.success(request, f"✅ เพิ่มสินค้า {sku_code} เรียบร้อย")
+                    return redirect('po_detail', po_id=po.id)
+                except MasterItem.DoesNotExist:
+                     messages.error(request, f"❌ ไม่พบสินค้า SKU: {sku_code}")
+                except Exception as e:
+                     messages.error(request, f"❌ Error: {e}")
+
+        elif action and action.startswith('delete_item_'):
+             try:
+                 item_id = action.split('_')[2]
+                 POItem.objects.filter(id=item_id, header=po).delete()
+                 messages.success(request, "✅ ลบรายการสินค้าเรียบร้อย")
+                 return redirect('po_detail', po_id=po.id)
+             except Exception as e:
+                 messages.error(request, f"Cannot delete item: {e}")
                 
-                # Auto-check status if we want to auto-complete PO?
-                # Need logic to check if all items fully received.
-                
-    return render(request, 'inventory/po_detail.html', {'po': po})
+    master_items = MasterItem.objects.all().order_by('product_code')
+    return render(request, 'inventory/po_detail.html', {'po': po, 'master_items': master_items})
 
 @login_required
 def receive_po_item(request, po_item_id):

@@ -199,15 +199,11 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
             type="number"
             step="0.01"
             name="exchange_rate"
+            id="input_exchange_rate"
             class="form-control bg-dark text-white border-secondary"
             value="{{ po.exchange_rate }}"
-            {%
-            if
-            po.status
-            !="Pending"
-            %}readonly{%
-            endif
-            %}
+            oninput="calcTransportCost()"
+            {% if po.status != "Pending" %} {% endif %}
           />
         </div>
         <div class="col-md-3">
@@ -218,16 +214,17 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
             type="number"
             step="0.01"
             name="shipping_rate_yuan_per_cbm"
+            id="input_rate_yuan"
             class="form-control bg-dark text-white border-secondary"
             value="{{ po.shipping_rate_yuan_per_cbm }}"
-            {% if po.status != "Pending" %}readonly{% endif %}
+            oninput="calcTransportCost()"
           />
         </div>
         <div class="col-md-3">
             <label class="form-label text-muted small">รวมค่าขนส่ง (฿)</label>
             <div class="input-group">
-                 <input type="text" class="form-control bg-dark text-white border-secondary" readonly value="{{ po.transportation_cost|floatformat:2 }} ฿">
-                 <span class="input-group-text bg-secondary text-white border-secondary small" style="font-size: 0.7em;">
+                 <input type="text" id="input_transport_cost" class="form-control bg-dark text-white border-secondary" readonly value="{{ po.transportation_cost|floatformat:2 }} ฿">
+                 <span class="input-group-text bg-secondary text-white border-secondary small" style="font-size: 0.7em;" id="cbm_display" data-cbm="{{ po.total_cbm }}">
                     (CBM: {{ po.total_cbm|floatformat:2 }})
                  </span>
             </div>
@@ -423,11 +420,23 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
 
           <button
             type="submit"
-            class="btn btn-sm btn-success fw-bold text-nowrap px-3 shadow-sm"
+            name="action"
+            value="update_items"
+            class="btn btn-sm btn-primary fw-bold text-nowrap px-3 shadow-sm"
           >
-            <i class="bi bi-box-seam-fill me-1"></i> กดเพื่อบันทึกการรับสินค้า
+            <i class="bi bi-save me-1"></i> บันทึกแก้ไขรายการสินค้า
           </button>
         </div>
+
+        <!-- Add Item Button -->
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-warning text-nowrap"
+          data-bs-toggle="modal"
+          data-bs-target="#addItemModal"
+        >
+          <i class="bi bi-plus-lg me-1"></i> เพิ่มสินค้า
+        </button>
 
         <!-- History Button -->
         <button
@@ -475,6 +484,7 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
               >
                 Receive Now (รับครั้งนี้)
               </th>
+              <th rowspan="2" style="width: 50px"></th>
             </tr>
             <tr class="text-center small">
               <!-- Ordered Subcols -->
@@ -526,14 +536,15 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
               <td class="text-end">{{ item.price_baht|intcomma }}</td>
 
               <!-- Ordered Data -->
-              <td class="text-center bg-success bg-opacity-25">
-                {{ item.qty_ordered|intcomma }}
+              <!-- Ordered Data (Editable) -->
+              <td class="p-1">
+                <input type="number" name="qty_ordered_{{ item.id }}" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="{{ item.qty_ordered }}" min="0">
               </td>
-              <td class="text-center bg-success bg-opacity-25">
-                {{ item.cbm|floatformat:2|default_if_none:"-" }}
+              <td class="p-1">
+                 <input type="number" step="0.0001" name="cbm_{{ item.id }}" class="form-control form-control-sm bg-dark text-white border-secondary text-center item-cbm-input" value="{{ item.cbm|default_if_none:0 }}" oninput="recalcTotalCBM()">
               </td>
-              <td class="text-center bg-success bg-opacity-25">
-                {{ item.weight|floatformat:2|default_if_none:"-" }}
+              <td class="p-1">
+                <input type="number" step="0.01" name="weight_{{ item.id }}" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="{{ item.weight|default_if_none:0 }}">
               </td>
 
               <!-- Received Data -->
@@ -584,6 +595,11 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
                   placeholder="0"
                 />
               </td>
+              <td class="text-center">
+                  <button type="submit" name="action" value="delete_item_{{ item.id }}" class="btn btn-sm btn-link text-danger p-0" onclick="return confirm('ลบรายการนี้?');" title="Delete">
+                      <i class="bi bi-x-lg"></i>
+                  </button>
+              </td>
             </tr>
             {% endfor %}
           </tbody>
@@ -595,6 +611,15 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
 
 <script>
   // When checkbox changes
+  function calcTransportCost() {
+      const exRate = parseFloat(document.getElementById('input_exchange_rate').value) || 0;
+      const yuanRate = parseFloat(document.getElementById('input_rate_yuan').value) || 0;
+      const totalCbm = parseFloat(document.getElementById('cbm_display').getAttribute('data-cbm')) || 0;
+      
+      const totalBaht = totalCbm * yuanRate * exRate;
+      document.getElementById('input_transport_cost').value = totalBaht.toFixed(2) + " ฿";
+  }
+
   function onCheckboxChange(itemId) {
     const checkbox = document.getElementById("chk_" + itemId);
     const input = document.getElementById("qty_" + itemId);
@@ -692,4 +717,79 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
   </div>
 </div>
 
+
+
+<!-- Add Item Modal -->
+<div class="modal fade" id="addItemModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content bg-dark text-white border-secondary">
+        <form method="POST">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="add_item">
+          
+          <div class="modal-header border-secondary">
+            <h5 class="modal-title">เพิ่มสินค้า (Add Item)</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+              <div class="mb-3">
+                  <label class="form-label">Search SKU / Name</label>
+                  <input type="text" name="sku_code" class="form-control bg-dark text-white border-secondary" placeholder="Enter SKU" required list="skuOptions">
+                  <datalist id="skuOptions">
+                      {% for m in master_items %}
+                      <option value="{{ m.product_code }}">{{ m.name }}</option>
+                      {% endfor %}
+                  </datalist>
+              </div>
+              <div class="row">
+                  <div class="col-4">
+                      <label class="form-label">Qty</label>
+                      <input type="number" name="new_qty" class="form-control bg-dark text-white border-secondary" value="1" min="1" required>
+                  </div>
+                  <div class="col-4">
+                      <label class="form-label">CBM</label>
+                      <input type="number" step="0.0001" name="new_cbm" class="form-control bg-dark text-white border-secondary" value="0">
+                  </div>
+                  <div class="col-4">
+                      <label class="form-label">Weight</label>
+                      <input type="number" step="0.01" name="new_weight" class="form-control bg-dark text-white border-secondary" value="0">
+                  </div>
+              </div>
+               <div class="row mt-2">
+                  <div class="col-6">
+                      <label class="form-label">Price (Yuan)</label>
+                      <input type="number" step="0.01" name="new_price_yuan" class="form-control bg-dark text-white border-secondary" value="0">
+                  </div>
+              </div>
+          </div>
+          <div class="modal-footer border-secondary">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            <button type="submit" class="btn btn-primary">Add Item</button>
+          </div>
+        </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Recalculate total CBM from inputs
+  function recalcTotalCBM() {
+      let total = 0;
+      document.querySelectorAll('.item-cbm-input').forEach(input => {
+          total += parseFloat(input.value) || 0;
+      });
+      
+      // Update Display and Data Attribute
+      const display = document.getElementById('cbm_display');
+      if(display) {
+          display.setAttribute('data-cbm', total);
+          display.innerText = `(CBM: ${total.toFixed(2)})`;
+      }
+      
+      // Trigger cost recalc
+      if (typeof calcTransportCost === "function") {
+          calcTransportCost();
+      }
+  }
+</script>
 {% endblock %}

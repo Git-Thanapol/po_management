@@ -53,20 +53,17 @@
                 required
                 onchange="toggleImportFields()"
               >
-                <option value="IMPORTED">Imported (นำเข้า)</option>
-                <option value="DOMESTIC">Domestic (ภายในประเทศ)</option>
+                <option value="IMPORTED">สินค้านำเข้า</option>
+                <option value="DOMESTIC">สินค้าภายในประเทศ</option>
               </select>
             </div>
             <div class="col-md-3 import-field">
-              <label class="form-label"
-                >การขนส่ง (Shipping) <span class="text-danger">*</span></label
-              >
+              <label class="form-label">การขนส่ง (Shipping)</label>
               <select
                 name="shipping_type"
                 class="form-select"
                 id="shipping_type"
                 onchange="calcEstimatedDate()"
-                required
               >
                 <option value="CAR">Car (รถ)</option>
                 <option value="SHIP">Ship (เรือ)</option>
@@ -89,23 +86,19 @@
 
             <!-- Import Only Fields -->
             <div class="col-md-3 import-field">
-              <label class="form-label"
-                >เรทเงิน (Exchange Rate)
-                <span class="text-danger">*</span></label
-              >
+              <label class="form-label">เรทเงิน (Exchange Rate)</label>
               <input
                 type="number"
                 step="0.0001"
                 name="exchange_rate"
                 id="exchange_rate"
                 class="form-control"
-                value="5.0"
+                value="1.0"
                 oninput="recalcAll()"
-                required
               />
             </div>
             <div class="col-md-3 import-field">
-              <label class="form-label">ค่าส่ง/CBM (หยวน)</label>
+              <label class="form-label">เรทขนส่ง</label>
               <input
                 type="number"
                 step="0.01"
