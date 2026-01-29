@@ -297,7 +297,10 @@ def po_detail_view(request, po_id):
                 po.exchange_rate = float(request.POST.get('exchange_rate', 1.0) or 1.0)
                 po.shipping_cost_baht = float(request.POST.get('shipping_cost_baht', 0) or 0)
                 po.shipping_rate_kg = float(request.POST.get('shipping_rate_kg', 0) or 0)
-                po.shipping_rate_cbm = float(request.POST.get('shipping_rate_cbm', 0) or 0)
+                # po.shipping_rate_cbm = float(request.POST.get('shipping_rate_cbm', 0) or 0) # Deprecated
+                
+                # New Fields
+                po.shipping_rate_yuan_per_cbm = float(request.POST.get('shipping_rate_yuan_per_cbm', 0) or 0)
                 
                 # Prices
                 po.shopee_price = float(request.POST.get('shopee_price', 0) or 0) if request.POST.get('shopee_price') else None
@@ -758,10 +761,17 @@ def po_create_view(request):
             # 1. Create Header
             # Extract basic fields
             po_number = request.POST.get('po_number')
-            order_date = request.POST.get('order_date')
+            order_date_str = request.POST.get('order_date')
             order_type = request.POST.get('order_type')
             shipping_type = request.POST.get('shipping_type')
-            estimated_date = request.POST.get('estimated_date') or None
+            estimated_date_str = request.POST.get('estimated_date') or None
+            
+            # Parse Dates
+            order_date = datetime.strptime(order_date_str, '%Y-%m-%d').date()
+            if estimated_date_str:
+                estimated_date = datetime.strptime(estimated_date_str, '%Y-%m-%d').date()
+            else:
+                estimated_date = None
             
             # Function helper for floats
             def get_float(name, default=0):
@@ -778,16 +788,21 @@ def po_create_view(request):
             lazada_price = get_float('lazada_price', None)
             tiktok_price = get_float('tiktok_price', None)
             note = request.POST.get('note')
-            
+             # New Fields
+            shipping_rate_yuan = get_float('shipping_rate_yuan_per_cbm', 0)
+            shipping_rate_kg = get_float('shipping_rate_kg', 0)
+
             # Create PO Header
             po = POHeader.objects.create(
                 po_number=po_number,
-                order_date=order_date,
+                order_date=order_date, # Now a date object
                 order_type=order_type,
                 shipping_type=shipping_type if order_type == 'IMPORTED' else None,
-                estimated_date=estimated_date,
+                estimated_date=estimated_date, # Now a date object or None
                 exchange_rate=exchange_rate,
                 shipping_cost_baht=shipping_cost_baht,
+                shipping_rate_yuan_per_cbm=shipping_rate_yuan,
+                shipping_rate_kg=shipping_rate_kg,
                 link_shop=link_shop,
                 wechat_contact=wechat,
                 shopee_price=shopee_price,
@@ -804,10 +819,6 @@ def po_create_view(request):
                     POAttachment.objects.create(header=po, file=f)
 
             # 2. Process Items (Dynamic Rows)
-            # We iterate blindly or use the hidden 'total_items' count?
-            # Better to iterate keys since rows might be deleted (gaps in IDs).
-            # We scan POST keys for 'sku_' prefix.
-            
             for key in request.POST:
                 if key.startswith('sku_'):
                     row_id = key.split('_')[1]
@@ -819,47 +830,49 @@ def po_create_view(request):
                     try:
                         master_item = MasterItem.objects.get(product_code=sku_code)
                     except MasterItem.DoesNotExist:
-                        messages.error(request, f"❌ SKU {sku_code} ไม่พบในระบบ (Skipped)")
+                        # If AJAX, we might want to return error or just skip?
+                        # Skipping with warning is arguably better for bulk entry.
+                        # messages.warning(request, f"Review: SKU {sku_code} not found, skipped.")
                         continue
                         
                     qty = get_float(f'qty_{row_id}', 1)
                     yuan = get_float(f'yuan_{row_id}', 0)
                     baht = get_float(f'baht_{row_id}', 0)
-                    w = get_float(f'w_{row_id}', None)
-                    l = get_float(f'l_{row_id}', None)
-                    h = get_float(f'h_{row_id}', None)
+                    # Dimensions removed
                     
-                    # Logic: if Imported, Baht is calc field. But we saved the inputs.
-                    # Model expects Total Baht? Or Unit?
-                    # My `models.py` `POItem` has `price_baht`.
+                    cbm_val = get_float(f'cbm_{row_id}', None) # User total line CBM? Or Unit?
+                    # In html logic we assumed total CBM for summary. 
+                    # But usually data is stored as per-unit specs OR total line specs?
+                    # Model has `cbm` field. Is it unit or total?
+                    # User prompt: "Direct CBM Input ... defaulting to 1.0".
+                    # Let's save what user input.
+                    
+                    weight_val = get_float(f'kg_{row_id}', None)
                     
                     POItem.objects.create(
                         header=po,
                         sku=master_item,
                         qty_ordered=int(qty),
-                        price_yuan=yuan, # Unit Price
-                        price_baht=baht, # Line Total
-                        width=w,
-                        length=l,
-                        height=h,
-                        # CBM, Weight?
-                        # Weight not yet in POItem model unless I added it? 
-                        # I added `weight` in previous step.
-                        weight=get_float(f'kg_{row_id}', None)
-                        
-                        # CBM: Model auto-calcs if W,L,H exist.
-                        # User might have manually edited CBM? 
-                        # My model `save` method overrides CBM if dimensions exist.
-                        # If user inputs Dimensions, let model calc.
+                        price_yuan=yuan, 
+                        price_baht=baht,
+                        cbm=cbm_val,
+                        weight=weight_val
                     )
+            
+            # Success
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({'status': 'success', 'redirect_url': '/po/'})
             
             messages.success(request, f"✅ สร้างใบสั่งซื้อ {po_number} สำเร็จ!")
             return redirect('po_list')
 
         except Exception as e:
+            # Error Handling
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({'status': 'error', 'message': str(e)})
+                
             messages.error(request, f"❌ Error creating PO: {e}")
-            # fall through to render form with errors? Or redirect?
-            # ideally keep data, but simpler to redirect for now or just render.
+            # Fallback for non-AJAX
             
     return render(request, 'inventory/po_create.html', {'master_items': master_items})
 

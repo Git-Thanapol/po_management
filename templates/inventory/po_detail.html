@@ -212,65 +212,29 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
         </div>
         <div class="col-md-3">
           <label class="form-label text-muted small"
-            >เรทค่าส่ง (Rate KG / คิว)</label
-          >
-          <div class="input-group">
-            <input
-              type="number"
-              step="0.01"
-              name="shipping_rate_kg"
-              class="form-control bg-dark text-white border-secondary"
-              placeholder="KG"
-              value="{{ po.shipping_rate_kg }}"
-              {%
-              if
-              po.status
-              !="Pending"
-              %}readonly{%
-              endif
-              %}
-            />
-            <span
-              class="input-group-text bg-secondary text-white border-secondary"
-              >/</span
-            >
-            <input
-              type="number"
-              step="0.01"
-              name="shipping_rate_cbm"
-              class="form-control bg-dark text-white border-secondary"
-              placeholder="CBM"
-              value="{{ po.shipping_rate_cbm }}"
-              {%
-              if
-              po.status
-              !="Pending"
-              %}readonly{%
-              endif
-              %}
-            />
-          </div>
-        </div>
-        <div class="col-md-3">
-          <label class="form-label text-muted small"
-            >ค่าขนส่ง/ชิ้น (Shipping Cost ฿)</label
+            >เรทค่าขนส่ง (¥/CBM)</label
           >
           <input
             type="number"
             step="0.01"
-            name="shipping_cost_baht"
+            name="shipping_rate_yuan_per_cbm"
             class="form-control bg-dark text-white border-secondary"
-            value="{{ po.shipping_cost_baht }}"
-            {%
-            if
-            po.status
-            !="Pending"
-            %}readonly{%
-            endif
-            %}
+            value="{{ po.shipping_rate_yuan_per_cbm }}"
+            {% if po.status != "Pending" %}readonly{% endif %}
           />
         </div>
+        <div class="col-md-3">
+            <label class="form-label text-muted small">รวมค่าขนส่ง (฿)</label>
+            <div class="input-group">
+                 <input type="text" class="form-control bg-dark text-white border-secondary" readonly value="{{ po.transportation_cost|floatformat:2 }} ฿">
+                 <span class="input-group-text bg-secondary text-white border-secondary small" style="font-size: 0.7em;">
+                    (CBM: {{ po.total_cbm|floatformat:2 }})
+                 </span>
+            </div>
+        </div>
       </div>
+        </div>
+        
 
       <hr class="border-secondary opacity-50" />
       <h6 class="text-white mb-3 small opacity-75">
@@ -566,7 +530,7 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
                 {{ item.qty_ordered|intcomma }}
               </td>
               <td class="text-center bg-success bg-opacity-25">
-                {{ item.cbm|floatformat:4|default_if_none:"-" }}
+                {{ item.cbm|floatformat:2|default_if_none:"-" }}
               </td>
               <td class="text-center bg-success bg-opacity-25">
                 {{ item.weight|floatformat:2|default_if_none:"-" }}
@@ -577,7 +541,7 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
                 {{ item.total_received_qty|intcomma }}
               </td>
               <td class="text-center bg-info bg-opacity-25">
-                {{ item.total_received_cbm|floatformat:4|default_if_none:"-" }}
+                {{ item.total_received_cbm|floatformat:2|default_if_none:"-" }}
               </td>
               <td class="text-center bg-info bg-opacity-25">
                 {{ item.total_received_weight|floatformat:2|default_if_none:"-" }}
@@ -707,7 +671,7 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
                 <td>{{ item.sku.name|truncatechars:40 }}</td>
                 <td class="text-end">{{ receipt.received_qty }}</td>
                 <td class="text-end">
-                  {{ receipt.received_cbm|floatformat:4 }}
+                  {{ receipt.received_cbm|floatformat:2 }}
                 </td>
                 <td class="text-end">
                   {{ receipt.received_weight|floatformat:2 }}

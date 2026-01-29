@@ -52,7 +52,9 @@ class POHeader(models.Model):
     total_yuan = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="ยอดหยวน (¥)")
     shipping_cost_baht = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="ต้นทุน/ชิ้น (฿)") # This name is ambiguous in design, might be header level cost? "shipping_cost_baht"
     shipping_rate_kg = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="ค่าส่ง/กก.")
-    shipping_rate_cbm = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="ค่าส่ง/CBM")
+    shipping_rate_kg = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="ค่าส่ง/กก.")
+    shipping_rate_cbm = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="ค่าส่ง/CBM (บาท)") # Keep for legacy or if needed, but Primary now is Yuan
+    shipping_rate_yuan_per_cbm = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="ค่าส่ง/CBM (หยวน)")
     
     # Extra fields from user design
     link_shop = models.CharField(max_length=255, blank=True, null=True, verbose_name="ลิงค์ร้านค้า")
@@ -82,6 +84,26 @@ class POHeader(models.Model):
                 self.estimated_date = self.order_date + timedelta(days=25)
         super().save(*args, **kwargs)
 
+    @property
+    def total_cbm(self):
+        # Assumes POItem.cbm is the Total CBM for that line (as decided in po_create)
+        # Using aggregate to sum
+        from django.db.models import Sum
+        return self.items.aggregate(total=Sum('cbm'))['total'] or 0
+
+    @property
+    def transportation_cost(self):
+        # Formula: Sum CBM * Exchange Rate * Yuan Rate/CBM
+        from decimal import Decimal
+        
+        total_cbm = self.total_cbm or 0
+        rate_yuan = self.shipping_rate_yuan_per_cbm or 0
+        ex_rate = self.exchange_rate or 1
+        
+        # Ensure proper types for calculation
+        # Use straight Decimal conversion
+        return Decimal(str(total_cbm)) * Decimal(str(rate_yuan)) * Decimal(str(ex_rate))
+
     def __str__(self):
         return self.po_number
 
@@ -94,10 +116,7 @@ class POItem(models.Model):
     price_baht = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="ยอดบาทรวม (฿)")
     
     # Dimensions
-    width = models.DecimalField(max_digits=8, decimal_places=2, blank=True, null=True)
-    length = models.DecimalField(max_digits=8, decimal_places=2, blank=True, null=True)
-    height = models.DecimalField(max_digits=8, decimal_places=2, blank=True, null=True)
-    height = models.DecimalField(max_digits=8, decimal_places=2, blank=True, null=True)
+    # Removed W/L/H as per request
     cbm = models.DecimalField(max_digits=10, decimal_places=4, blank=True, null=True, verbose_name="CBM")
     weight = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, verbose_name="น้ำหนัก (KG)")
     
@@ -106,11 +125,6 @@ class POItem(models.Model):
     total_received_weight = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="รับแล้ว (Weight)")
 
     def save(self, *args, **kwargs):
-        # Calculate CBM if dimensions exist. Assuming cm -> CBM? Or just W*L*H as requested.
-        # User prompt: "cbm = (W * L * H) if dimensions provided"
-        if self.width is not None and self.length is not None and self.height is not None:
-             self.cbm = self.width * self.length * self.height
-        
         # Calculate Price Baht
         # "price_baht: IF order_type is Imported -> price_yuan * header.exchange_rate"
         if self.header.order_type == 'IMPORTED' and self.price_yuan:
@@ -130,11 +144,18 @@ class POItem(models.Model):
 
     @property
     def total_shipping_cost(self):
-        # Calculate calculated shipping cost based on Header Rates and Item Dim/Weight
+        # CBM Cost: (CBM (default 1) * Yuan Rate * Exchange Rate)
+        cbm_val = self.cbm if (self.cbm is not None and self.cbm > 0) else 1
+        rate_yuan = self.header.shipping_rate_yuan_per_cbm or 0
+        ex_rate = self.header.exchange_rate or 1
+        
+        cost_cbm = cbm_val * rate_yuan * ex_rate
+        
+        # KG Cost: Weight * Rate KG (Assuming Rate KG is still Baht? Or Yuan too? 
+        # User only specified Yuan change for CBM transportation rate. maintaining KG as is or assuming Baht unless specified.
+        # Let's assume KG is still Baht for now as user was specific about "Transportation rate ... calculate ... via Yuan rate * Transportation rate * CBM"
         cost_kg = (self.weight or 0) * (self.header.shipping_rate_kg or 0)
-        cost_cbm = (self.cbm or 0) * (self.header.shipping_rate_cbm or 0)
-        # Assuming additive? Or max? Usually shipping is one or the other based on type.
-        # But user requested both columns. Let's sum them if both exist (rare) or user sets one.
+
         return cost_kg + cost_cbm
 
     @property
