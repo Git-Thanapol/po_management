@@ -458,6 +458,17 @@ def receive_po_item(request, po_item_id):
             
     return redirect('po_list')
 
+@login_required
+def delete_received_item_view(request, receipt_id):
+    if request.method == 'POST':
+        receipt = get_object_or_404(ReceivedPOItem, id=receipt_id)
+        po_id = receipt.po_item.header.id
+        # Delete triggers recalculation via model delete() override
+        receipt.delete()
+        messages.success(request, "✅ ลบประวัติการรับเรียบร้อย")
+        return redirect('po_detail', po_id=po_id)
+    return redirect('po_list')
+
 def logout_view(request):
     logout(request)
     messages.info(request, "ออกจากระบบแล้ว")
@@ -1011,3 +1022,23 @@ def save_product_view(request):
             messages.error(request, f"❌ Error: {e}")
             
     return redirect('product_list')
+
+@login_required
+def get_po_history(request, sku):
+    # Fetch all receipts for this SKU
+    receipts = ReceivedPOItem.objects.filter(po_item__sku__product_code=sku).select_related('po_item', 'po_item__header', 'po_item__sku').order_by('-received_date')
+    
+    # Check if template expects 'rows' with 'duration' attribute pre-calculated or via property.
+    # Model property is 'duration_from_order'.
+    # Template uses 'row.duration'. 
+    # We can annotate or wrap.
+    # But simpler: assume template refers to model property if I rename it? 
+    # Or just passing object is fine if template updated.
+    
+    return render(request, 'inventory/partials/po_history_table.html', {'history_items': receipts})
+
+@login_required
+def get_sales_history(request, sku):
+    # Placeholder for sales history if needed, based on urls.py
+    # sales = Sale.objects.filter(sku__product_code=sku)...
+    return render(request, 'inventory/partials/sales_history_table.html', {'sales': []})

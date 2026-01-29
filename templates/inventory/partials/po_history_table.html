@@ -31,6 +31,7 @@
         <th>TIKTOK</th>
         <th>หมายเหตุ</th>
         <th>ร้านค้า</th>
+        <th>จัดการ</th>
       </tr>
     </thead>
     <tbody>
@@ -69,7 +70,8 @@
           {{ row.received_date|date:"d/m/Y"|default:"-" }}
         </td>
         <td class="text-center">
-          {% if row.duration %} {{ row.duration }} วัน {% else %} - {% endif %}
+          {% if row.duration_from_order %} {{ row.duration_from_order }} วัน {%
+          else %} - {% endif %}
         </td>
         <td class="text-end text-success fw-bold">
           {{ row.item.total_received_qty|intcomma }}
@@ -113,6 +115,22 @@
             ><i class="bi bi-link-45deg"></i> Link</a
           >
           {% else %} - {% endif %}
+        </td>
+        <td class="text-center">
+          <form
+            action="{% url 'delete_received_item' row.id %}"
+            method="post"
+            onsubmit="
+              return confirm(
+                'ยืนยันลบประวัติการรับสินค้านี้? ข้อมูลจำนวนคงเหลือจะถูกคำนวณใหม่',
+              );
+            "
+          >
+            {% csrf_token %}
+            <button type="submit" class="btn btn-sm btn-danger px-2 py-0">
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
         </td>
       </tr>
       {% empty %}

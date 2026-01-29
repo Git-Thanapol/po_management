@@ -236,7 +236,7 @@ class ImportService:
         
         for index, row in df.iterrows():
             try:
-                code = str(row.get('รหัสสินค้า', '')).strip()
+                code = str(row.get('รหัสSKU', '')).strip()
                 if not code or code == 'nan':
                     continue
 
@@ -247,9 +247,9 @@ class ImportService:
                 
                 JSTStockSnapshot.objects.create(
                     sku=master_item,
-                    quantity=row.get('คงเหลือ', 0),
-                    jst_min_limit=row.get('Min_Limit', 0),
-                    note=row.get('Note', ''),
+                    quantity=row.get('จํานวนที่ใช้ได้', 0),
+                    jst_min_limit=row.get('จำนวนน้อยสุดในการเติมสินค้า (MIN)', 0),
+                    note=row.get('หมายเหตุสินค้า', ''),
                     # raw_type=row.get('Type', '')
                 )
                 

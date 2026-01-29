@@ -340,13 +340,9 @@ JST System{% endblock %} {% block content %}
                   {{ item.header.exchange_rate|floatformat:2 }}
                 </td>
 
-                <!-- Transport Rate -->
+                <!-- Transport Cost -->
                 <td class="text-center">
-                  {% if item.header.shipping_rate_kg > 0 %} {{
-                  item.header.shipping_rate_kg|floatformat:2 }} (KG) {% elif
-                  item.header.shipping_rate_cbm > 0 %} {{
-                  item.header.shipping_rate_cbm|floatformat:2 }} (CBM) {% else
-                  %} - {% endif %}
+                  {{ item.header.transportation_cost|floatformat:2|intcomma }}
                 </td>
 
                 <!-- Shipping Metrics -->
@@ -387,20 +383,15 @@ JST System{% endblock %} {% block content %}
 
                 <!-- New Column: Attachments -->
                 <td class="text-center">
-                  {% for att in item.header.attachments.all %} {% if att.file %}
-                  <div>
-                    <a
-                      href="{{ att.file.url }}"
-                      target="_blank"
-                      class="text-decoration-none small text-body"
-                      title="{{ att.filename }}"
-                    >
-                      <i class="bi bi-file-earmark-text"></i> ไฟล์แนบ
-                    </a>
-                  </div>
-                  {% endif %} {% empty %}
+                  {% with count=item.header.attachments.count %} 
+			{% if count > 0 %}
+                  <span class="badge bg-secondary text-white"
+                    >ไฟล์แนบจำนวน {{ count }}</span
+                  >
+                  {% else %}
                   <span class="text-muted small">-</span>
-                  {% endfor %}
+                  {% endif %} 
+		{% endwith %}
                 </td>
 
                 <!-- New Column: Shop Link -->

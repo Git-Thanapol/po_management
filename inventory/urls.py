@@ -17,6 +17,7 @@ urlpatterns = [
     path('po/<int:po_id>/', views.po_detail_view, name='po_detail'),
     path('po/receive/<int:po_item_id>/', views.receive_po_item, name='receive_po_item'),
     path('po/create/', views.po_create_view, name='po_create'), # New URL
+    path('po/receipt/delete/<int:receipt_id>/', views.delete_received_item_view, name='delete_received_item'),
     path('stock/update-limit/<str:sku>/', views.update_min_limit, name='update_min_limit'),
     path('products/', views.product_list_view, name='product_list'),
     path('products/get/<str:sku>/', views.get_product_detail, name='get_product_detail'),

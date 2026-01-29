@@ -196,6 +196,65 @@ class ReceivedPOItem(models.Model):
         super().save(*args, **kwargs)
         self.update_po_item_received()
 
+    def delete(self, *args, **kwargs):
+        # Keep reference to update parent
+        parent_item = self.po_item
+        super().delete(*args, **kwargs)
+        # Recalculate parent
+        # We can call the method on a fresh instance or static, 
+        # but since the logic is on the instance method `update_po_item_received` which uses `self.po_item`,
+        # we can't call it on deleted `self`.
+        # Better to have helper or call logic here.
+        # Actually logic is: data = parent_item.receipts.aggregate...
+        # So we can just replicate or move logic to parent model?
+        # Or Just:
+        data = parent_item.receipts.aggregate(
+            total_qty=models.Sum('received_qty'),
+            total_cbm=models.Sum('received_cbm'),
+            total_weight=models.Sum('received_weight')
+        )
+        parent_item.total_received_qty = data['total_qty'] or 0
+        parent_item.total_received_cbm = data['total_cbm'] or 0
+        parent_item.total_received_weight = data['total_weight'] or 0
+        parent_item.save()
+        # Also check completion?
+        # Re-check completion logic on parent?
+        # `ReceivedPOItem` assumes `self.check_po_completion()` exists.
+        # It's better to move `update_po_item_received` to `POItem` model ideally, but user asked for quick fix.
+        # For now, I will manually update parent here.
+        
+        # Check completion logic replicate or call method if exists?
+        # `check_po_completion` is on ReceivedPOItem (Line 182 in viewed content).
+        # It updates `header`.
+        # I should verify `check_po_completion` implementation. 
+        # Line 182-206. It checks `header.items.all()`.
+        # So I should copy that logic or make it reusable.
+        # Ideally, move these to `POItem` model methods: `update_received_stats()` and `header.check_completion()`.
+        # But to be safe and minimal:
+        self.update_po_completion_manual(parent_item)
+
+    def update_po_completion_manual(self, po_item):
+        # Re-implementation of check_po_completion for delete usage
+        header = po_item.header
+        all_items = header.items.all()
+        is_complete = True
+        if not all_items.exists():
+            is_complete = False
+        else:
+            for item in all_items:
+                 qty_met = (item.qty_ordered > 0 and item.total_received_qty >= item.qty_ordered)
+                 cbm_met = (item.cbm and item.cbm > 0 and item.total_received_cbm >= item.cbm)
+                 weight_met = (item.weight and item.weight > 0 and item.total_received_weight >= item.weight)
+                 if not (qty_met or cbm_met or weight_met):
+                    is_complete = False
+                    break
+        
+        if is_complete:
+            header.status = 'Complete'
+        else:
+            header.status = 'Pending'
+        header.save()
+
     def update_po_item_received(self):
         data = self.po_item.receipts.aggregate(
             total_qty=models.Sum('received_qty'),
