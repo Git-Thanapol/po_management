@@ -1,7 +1,9 @@
 from django.db import models
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
+from django.db.models import Sum, F
 from datetime import timedelta, date
+from decimal import Decimal
 
 class MasterItem(models.Model):
     product_code = models.CharField(max_length=100, primary_key=True, verbose_name="รหัสสินค้า") # SKU
@@ -21,8 +23,6 @@ class MasterItem(models.Model):
     lazada_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="ราคาขาย Lazada")
     tiktok_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="ราคาขาย TikTok")
     
-    # Financials (implied from sales/po, but good to have master price if needed, though not explicitly in Master Design)
-
     def __str__(self):
         return f"{self.product_code} - {self.name}"
 
@@ -35,10 +35,19 @@ class POHeader(models.Model):
         ('CAR', 'Car'),
         ('SHIP', 'Ship'),
     ]
+    # Status constants for logic
+    STATUS_PENDING = 'Pending' # Waiting for shipment
+    STATUS_ARRIVING = 'Arriving Soon'
+    STATUS_OVERDUE = 'Overdue'
+    STATUS_INCOMPLETE = 'Incomplete'
+    STATUS_COMPLETE = 'Complete'
+
     STATUS_CHOICES = [
-        ('Pending', 'Pending'),
-        ('Complete', 'Complete'),
-        # Add more if needed
+        (STATUS_PENDING, 'Waiting for Shipment (สินค้ารอจัดส่ง)'),
+        (STATUS_ARRIVING, 'Arriving Soon (สินค้าใกล้ถึง)'),
+        (STATUS_OVERDUE, 'Overdue (เลยกำหนดจัดส่ง)'),
+        (STATUS_INCOMPLETE, 'Incomplete (สินค้าไม่ครบ)'),
+        (STATUS_COMPLETE, 'Complete (เรียบร้อย)'),
     ]
 
     po_number = models.CharField(max_length=50, unique=True, verbose_name="เลข PO")
@@ -49,60 +58,117 @@ class POHeader(models.Model):
     estimated_date = models.DateField(blank=True, null=True, verbose_name="วันคาดการณ์")
     
     exchange_rate = models.DecimalField(max_digits=10, decimal_places=4, default=1.0, verbose_name="เรทเงิน")
-    total_yuan = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="ยอดหยวน (¥)")
-    shipping_cost_baht = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="ต้นทุน/ชิ้น (฿)") # This name is ambiguous in design, might be header level cost? "shipping_cost_baht"
-    shipping_rate_kg = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="ค่าส่ง/กก.")
-    shipping_rate_kg = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="ค่าส่ง/กก.")
-    shipping_rate_cbm = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="ค่าส่ง/CBM (บาท)") # Keep for legacy or if needed, but Primary now is Yuan
-    shipping_rate_yuan_per_cbm = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="ค่าส่ง/CBM (หยวน)")
     
-    # Extra fields from user design
+    # New Costing Fields
+    total_yuan = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="ยอดหยวนรวม (Input)")
+    shipping_rate_thb_cbm = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="เรทค่าขนส่ง THB/คิว")
+    bill_date = models.DateField(blank=True, null=True, verbose_name="วันที่บิลเรียกเก็บ") # New field requested
+
+    # Extra fields
     link_shop = models.CharField(max_length=255, blank=True, null=True, verbose_name="ลิงค์ร้านค้า")
     wechat_contact = models.CharField(max_length=100, blank=True, null=True, verbose_name="WeChat / ติดต่อ")
     
-    # Selling Price Benchmarks?
-    shopee_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, verbose_name="ราคาขาย Shopee")
-    lazada_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, verbose_name="ราคาขาย Lazada")
-    tiktok_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, verbose_name="ราคาขาย TikTok")
+    # Benchmarks
+    ref_price_shopee = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, verbose_name="ราคา Shopee (Ref)")
+    ref_price_lazada = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, verbose_name="ราคา Lazada (Ref)")
+    ref_price_tiktok = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, verbose_name="ราคา TikTok (Ref)")
     
     note = models.TextField(blank=True, null=True, verbose_name="หมายเหตุ")
-    # Using FileField allowing multiple files is tricky in Django model directly, usually needs M2M or separate model.
-    # But for simplicity, let's add one file field or rely on a separate Attachment model if multiple needed.
-    # User said "Allow to upload multiple files". 
-    # I will create a separate model POAttachment later or just add one field for now to satisfy model schema.
-    # Actually, let's keep it simple: One file for now, or use a JSON field for paths?
-    # Spec says "Attach box" -> "Allow to upload multiple files".
-    # Best practice: POAttachment model.
     
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending', verbose_name="สถานะ")
+    # Status is now dynamic but we can store the last calculated state for easy querying
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default=STATUS_PENDING, verbose_name="สถานะ")
 
     def save(self, *args, **kwargs):
+        # Auto-calculate estimated date if missing
         if not self.estimated_date and self.order_date:
             if self.shipping_type == 'CAR':
                 self.estimated_date = self.order_date + timedelta(days=14)
             elif self.shipping_type == 'SHIP':
                 self.estimated_date = self.order_date + timedelta(days=25)
+        
         super().save(*args, **kwargs)
+        # Trigger Proration update after save? 
+        # Better to do it explicitly or via signal, but here is safe for simple updates.
+        # Only if PK exists (update)
+        if self.pk:
+            self.prorate_costs()
+            self.update_status()
+
+    def prorate_costs(self):
+        """
+        Prorate total_yuan to items based on qty_ordered.
+        Item Total Yuan = Header.total_yuan * (Item.qty_ordered / Header.total_qty)
+        """
+        items = self.items.all()
+        total_qty = items.aggregate(sum_qty=Sum('qty_ordered'))['sum_qty'] or 0
+        
+        if total_qty > 0 and self.total_yuan > 0:
+            for item in items:
+                ratio = Decimal(item.qty_ordered) / Decimal(total_qty)
+                item.price_yuan = self.total_yuan * ratio
+                item.price_baht = item.price_yuan * self.exchange_rate
+                item.save(update_fields=['price_yuan', 'price_baht'])
+        elif total_qty == 0:
+             # Reset if no qty
+             items.update(price_yuan=0, price_baht=0)
+
+    def update_status(self):
+        """
+        Update status based on logic:
+        1. Complete: Rx >= Ordered
+        2. Incomplete: Rx > 0 but < Ordered
+        3. Overdue: Rx == 0 and Today > Est Date
+        4. Arriving Soon: Rx == 0 and 0 <= (Est - Today) <= 7
+        5. Waiting: Default
+        """
+        items = self.items.all()
+        if not items.exists():
+            self.status = self.STATUS_PENDING
+            # Avoid recursion if called from save, use update or separate save
+            POHeader.objects.filter(pk=self.pk).update(status=self.status)
+            return
+
+        # Aggregates
+        aggs = items.aggregate(
+            total_ordered=Sum('qty_ordered'),
+            total_received=Sum('total_received_qty')
+        )
+        total_ordered = aggs['total_ordered'] or 0
+        total_received = aggs['total_received'] or 0
+        
+        today = date.today()
+        est_date = self.estimated_date
+        
+        new_status = self.STATUS_PENDING
+        
+        if total_received >= total_ordered and total_ordered > 0:
+            new_status = self.STATUS_COMPLETE
+        elif total_received > 0:
+            new_status = self.STATUS_INCOMPLETE
+        else:
+            # Not received yet
+            if est_date:
+                delta = (est_date - today).days
+                if delta < 0:
+                    new_status = self.STATUS_OVERDUE
+                elif 0 <= delta <= 7:
+                    new_status = self.STATUS_ARRIVING
+                else:
+                    new_status = self.STATUS_PENDING
+            else:
+                 new_status = self.STATUS_PENDING
+
+        if self.status != new_status:
+            self.status = new_status
+            POHeader.objects.filter(pk=self.pk).update(status=new_status)
 
     @property
-    def total_cbm(self):
-        # Assumes POItem.cbm is the Total CBM for that line (as decided in po_create)
-        # Using aggregate to sum
-        from django.db.models import Sum
-        return self.items.aggregate(total=Sum('cbm'))['total'] or 0
+    def total_received_cbm(self):
+        return self.items.aggregate(t=Sum('total_received_cbm'))['t'] or 0
 
     @property
-    def transportation_cost(self):
-        # Formula: Sum CBM * Exchange Rate * Yuan Rate/CBM
-        from decimal import Decimal
-        
-        total_cbm = self.total_cbm or 0
-        rate_yuan = self.shipping_rate_yuan_per_cbm or 0
-        ex_rate = self.exchange_rate or 1
-        
-        # Ensure proper types for calculation
-        # Use straight Decimal conversion
-        return Decimal(str(total_cbm)) * Decimal(str(rate_yuan)) * Decimal(str(ex_rate))
+    def total_received_weight(self):
+        return self.items.aggregate(t=Sum('total_received_weight'))['t'] or 0
 
     def __str__(self):
         return self.po_number
@@ -112,186 +178,108 @@ class POItem(models.Model):
     sku = models.ForeignKey(MasterItem, on_delete=models.CASCADE, verbose_name="รหัสสินค้า")
     qty_ordered = models.IntegerField(verbose_name="สั่งซื้อ")
     
-    price_yuan = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="ยอดหยวน (¥)")
-    price_baht = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="ยอดบาทรวม (฿)")
+    # Prorated Costs (Calculated)
+    price_yuan = models.DecimalField(max_digits=12, decimal_places=4, default=0, verbose_name="Total Yuan (Prorated)")
+    price_baht = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Total Baht")
     
-    # Dimensions
-    # Removed W/L/H as per request
-    cbm = models.DecimalField(max_digits=10, decimal_places=4, blank=True, null=True, verbose_name="CBM")
-    weight = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, verbose_name="น้ำหนัก (KG)")
-    
+    # Receiving Stats
     total_received_qty = models.IntegerField(default=0, verbose_name="รับแล้ว (จำนวน)")
     total_received_cbm = models.DecimalField(max_digits=10, decimal_places=4, default=0, verbose_name="รับแล้ว (CBM)")
     total_received_weight = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="รับแล้ว (Weight)")
 
     def save(self, *args, **kwargs):
-        # Calculate Price Baht
-        # "price_baht: IF order_type is Imported -> price_yuan * header.exchange_rate"
-        if self.header.order_type == 'IMPORTED' and self.price_yuan:
-            self.price_baht = self.price_yuan * self.header.exchange_rate
-        
+        # We don't calc price here primarily anymore, header does it. 
+        # But if we update qty, we should trigger header proration? 
+        # Ideally yes.
         super().save(*args, **kwargs)
 
     @property
-    def remaining_qty(self):
-        return max(0, self.qty_ordered - self.total_received_qty)
-
-    @property
     def unit_price_yuan(self):
-        if self.qty_ordered and self.qty_ordered > 0:
-            return self.price_yuan / self.qty_ordered
+        if self.qty_ordered > 0:
+            return self.price_yuan / Decimal(self.qty_ordered)
         return 0
 
     @property
     def total_shipping_cost(self):
-        # CBM Cost: (CBM (default 1) * Yuan Rate * Exchange Rate)
-        cbm_val = self.cbm if (self.cbm is not None and self.cbm > 0) else 1
-        rate_yuan = self.header.shipping_rate_yuan_per_cbm or 0
-        ex_rate = self.header.exchange_rate or 1
-        
-        cost_cbm = cbm_val * rate_yuan * ex_rate
-        
-        # KG Cost: Weight * Rate KG (Assuming Rate KG is still Baht? Or Yuan too? 
-        # User only specified Yuan change for CBM transportation rate. maintaining KG as is or assuming Baht unless specified.
-        # Let's assume KG is still Baht for now as user was specific about "Transportation rate ... calculate ... via Yuan rate * Transportation rate * CBM"
-        cost_kg = (self.weight or 0) * (self.header.shipping_rate_kg or 0)
-
-        return cost_kg + cost_cbm
+        # Calculated from Received CBM * Header Rate
+        # This is an approximation if viewed before full receipt? 
+        # Or summation of actual receipts? 
+        # Requirement: "Line Estimated Shipping Cost (THB) = Line Received CBM * Header.shipping_rate_thb_cbm"
+        cbm = self.total_received_cbm or 0
+        rate = self.header.shipping_rate_thb_cbm or 0
+        return Decimal(cbm) * Decimal(rate)
 
     @property
-    def unit_cost_baht(self):
-        # (Total Baht + Total Shipping) / Qty
-        total_b = (self.price_baht or 0) + self.total_shipping_cost
-        if self.qty_ordered and self.qty_ordered > 0:
-            return total_b / self.qty_ordered
+    def unit_cost_thb(self):
+        # (Total Baht + Total Shipping Cost) / Qty
+        total_thb = (self.price_baht or 0) + self.total_shipping_cost
+        if self.qty_ordered > 0:
+            return total_thb / Decimal(self.qty_ordered)
         return 0
-        
-    @property
-    def duration_days(self):
-        # Days from Order to Today (if pending) or Order to Received (if complete?)
-        # Simple logic: Order to Today
-        if self.header.order_date:
-            return (date.today() - self.header.order_date).days
-        return 0
+    
+    def __str__(self):
+        return f"{self.sku.product_code} (PO {self.header.po_number})"
+
+class POReceiptBatch(models.Model):
+    """
+    Represents a single "Receive Operation" (Batch) for a PO.
+    Groups multiple ReceivedPOItems together.
+    """
+    header = models.ForeignKey(POHeader, on_delete=models.CASCADE, related_name='receipt_batches')
+    batch_no = models.IntegerField(default=1, verbose_name="ครั้งที่")
+    bill_date = models.DateField(default=date.today, verbose_name="วันที่บิล")
+    received_date = models.DateField(default=date.today, verbose_name="วันที่รับ")
+    
+    # Batch Totals (Inputs)
+    total_cbm = models.DecimalField(max_digits=10, decimal_places=4, default=0, verbose_name="รวม CBM (Batch)")
+    total_weight = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="รวม KG (Batch)")
+    
+    note = models.TextField(blank=True, null=True, verbose_name="หมายเหตุ")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['batch_no']
 
     def __str__(self):
-        return f"{self.sku.product_code} in {self.header.po_number}"
+        return f"Batch {self.batch_no} - PO {self.header.po_number}"
 
 class ReceivedPOItem(models.Model):
     po_item = models.ForeignKey(POItem, on_delete=models.CASCADE, related_name='receipts')
+    # Link to Batch
+    batch = models.ForeignKey(POReceiptBatch, on_delete=models.CASCADE, related_name='items', null=True, blank=True)
+    
+    bill_date = models.DateField(default=date.today, verbose_name="วันที่บิล") # Deprecated? Keep for now just in case.
     received_qty = models.IntegerField(default=0, verbose_name="จำนวนที่รับ")
     received_cbm = models.DecimalField(max_digits=10, decimal_places=4, default=0, verbose_name="CBM ที่รับ")
     received_weight = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="น้ำหนักที่รับ")
     received_date = models.DateField(default=date.today, verbose_name="วันที่รับ")
-
-    @property
-    def duration_from_order(self):
-        if not self.po_item.header.order_date:
-            return "-"
-        delta = (self.received_date - self.po_item.header.order_date).days
-        # "ถ้าเป็นวันเดียวกันให้นับ 1" implies min 1 day
-        return delta if delta > 0 else 1
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
         self.update_po_item_received()
 
     def delete(self, *args, **kwargs):
-        # Keep reference to update parent
-        parent_item = self.po_item
+        item = self.po_item
         super().delete(*args, **kwargs)
-        # Recalculate parent
-        # We can call the method on a fresh instance or static, 
-        # but since the logic is on the instance method `update_po_item_received` which uses `self.po_item`,
-        # we can't call it on deleted `self`.
-        # Better to have helper or call logic here.
-        # Actually logic is: data = parent_item.receipts.aggregate...
-        # So we can just replicate or move logic to parent model?
-        # Or Just:
-        data = parent_item.receipts.aggregate(
-            total_qty=models.Sum('received_qty'),
-            total_cbm=models.Sum('received_cbm'),
-            total_weight=models.Sum('received_weight')
-        )
-        parent_item.total_received_qty = data['total_qty'] or 0
-        parent_item.total_received_cbm = data['total_cbm'] or 0
-        parent_item.total_received_weight = data['total_weight'] or 0
-        parent_item.save()
-        # Also check completion?
-        # Re-check completion logic on parent?
-        # `ReceivedPOItem` assumes `self.check_po_completion()` exists.
-        # It's better to move `update_po_item_received` to `POItem` model ideally, but user asked for quick fix.
-        # For now, I will manually update parent here.
-        
-        # Check completion logic replicate or call method if exists?
-        # `check_po_completion` is on ReceivedPOItem (Line 182 in viewed content).
-        # It updates `header`.
-        # I should verify `check_po_completion` implementation. 
-        # Line 182-206. It checks `header.items.all()`.
-        # So I should copy that logic or make it reusable.
-        # Ideally, move these to `POItem` model methods: `update_received_stats()` and `header.check_completion()`.
-        # But to be safe and minimal:
-        self.update_po_completion_manual(parent_item)
-
-    def update_po_completion_manual(self, po_item):
-        # Re-implementation of check_po_completion for delete usage
-        header = po_item.header
-        all_items = header.items.all()
-        is_complete = True
-        if not all_items.exists():
-            is_complete = False
-        else:
-            for item in all_items:
-                 qty_met = (item.qty_ordered > 0 and item.total_received_qty >= item.qty_ordered)
-                 cbm_met = (item.cbm and item.cbm > 0 and item.total_received_cbm >= item.cbm)
-                 weight_met = (item.weight and item.weight > 0 and item.total_received_weight >= item.weight)
-                 if not (qty_met or cbm_met or weight_met):
-                    is_complete = False
-                    break
-        
-        if is_complete:
-            header.status = 'Complete'
-        else:
-            header.status = 'Pending'
-        header.save()
+        # Update parent after delete
+        # Can't call checking logic on self, need helper
+        self._update_parent_stats(item)
 
     def update_po_item_received(self):
-        data = self.po_item.receipts.aggregate(
-            total_qty=models.Sum('received_qty'),
-            total_cbm=models.Sum('received_cbm'),
-            total_weight=models.Sum('received_weight')
-        )
-        self.po_item.total_received_qty = data['total_qty'] or 0
-        self.po_item.total_received_cbm = data['total_cbm'] or 0
-        self.po_item.total_received_weight = data['total_weight'] or 0
-        self.po_item.save()
-        self.check_po_completion()
+        self._update_parent_stats(self.po_item)
 
-    def check_po_completion(self):
-        header = self.po_item.header
-        all_items = header.items.all()
-        is_complete = True
-        
-        if not all_items.exists():
-            is_complete = False
-        else:
-            for item in all_items:
-                # User Rule: Complete if QTY OR CBM OR Weight meets target
-                # Check if ANY target is met (and target must be > 0 to be valid)
-                qty_met = (item.qty_ordered > 0 and item.total_received_qty >= item.qty_ordered)
-                cbm_met = (item.cbm and item.cbm > 0 and item.total_received_cbm >= item.cbm)
-                weight_met = (item.weight and item.weight > 0 and item.total_received_weight >= item.weight)
-                
-                if not (qty_met or cbm_met or weight_met):
-                    is_complete = False
-                    break
-        
-        if is_complete:
-            header.status = 'Complete'
-        else:
-            header.status = 'Pending' # Allow reverting to pending if edits happen
-            
-        header.save()
+    def _update_parent_stats(self, item):
+        data = item.receipts.aggregate(
+            total_qty=Sum('received_qty'),
+            total_cbm=Sum('received_cbm'),
+            total_weight=Sum('received_weight')
+        )
+        item.total_received_qty = data['total_qty'] or 0
+        item.total_received_cbm = data['total_cbm'] or 0
+        item.total_received_weight = data['total_weight'] or 0
+        item.save()
+        # Trigger header status update
+        item.header.update_status()
 
 class POAttachment(models.Model):
     header = models.ForeignKey(POHeader, on_delete=models.CASCADE, related_name='attachments')
@@ -302,9 +290,6 @@ class POAttachment(models.Model):
     def filename(self):
         import os
         return os.path.basename(self.file.name)
-
-    def __str__(self):
-        return f"File for {self.header.po_number}"
 
 class Sale(models.Model):
     PLATFORM_CHOICES = [
@@ -341,17 +326,11 @@ class Sale(models.Model):
         return f"{self.order_id} - {self.sku.product_code}"
 
 class JSTStockSnapshot(models.Model):
-    """
-    Stores the daily snapshot of stock from the JST legacy system file.
-    Used for the Hybrid Stock priority rule.
-    Maps to data_stock_jst.xlsx columns: รหัสสินค้า, ชื่อสินค้า, คงเหลือ, Type, Stock, Min_Limit, Note
-    """
     sku = models.ForeignKey(MasterItem, on_delete=models.CASCADE)
-    quantity = models.IntegerField(verbose_name="คงเหลือ") # This is 'Current_Stock' / 'Real_Stock_File'
+    quantity = models.IntegerField(verbose_name="คงเหลือ") 
     jst_min_limit = models.IntegerField(default=0, blank=True, null=True)
     snapshot_date = models.DateField(auto_now_add=True)
     
-    # We might want to store the raw values just in case
     raw_type = models.CharField(max_length=100, blank=True, null=True)
     note = models.TextField(blank=True, null=True)
 
@@ -384,3 +363,22 @@ class ImportLog(models.Model):
     def __str__(self):
         return f"{self.import_type} - {self.started_at.strftime('%Y-%m-%d %H:%M')}"
 
+# Signals to ensure Proration happens when Items are changed
+@receiver(post_save, sender=POItem)
+def update_header_proration_on_save(sender, instance, created, **kwargs):
+    # Avoid infinite loop: Proration updates items, which triggers save.
+    # Check if this save was triggered by proration update?
+    # We can check if 'price_yuan' was in update_fields.
+    if kwargs.get('update_fields') and 'price_yuan' in kwargs['update_fields']:
+        return
+    
+    # Recalculate header's proration for ALL items
+    if instance.header:
+        instance.header.prorate_costs()
+        instance.header.update_status()
+
+@receiver(post_delete, sender=POItem)
+def update_header_proration_on_delete(sender, instance, **kwargs):
+    if instance.header:
+        instance.header.prorate_costs()
+        instance.header.update_status()

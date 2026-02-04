@@ -4,13 +4,9 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
   <div class="col-12 d-flex justify-content-between align-items-center">
     <div>
       <h2 class="mb-0">
-        📄 รายละเอียดใบสั่งซื้อ (Detail) #<span class="text-info"
-          >{{ po.po_number }}</span
-        >
+        📄 รายละเอียดใบสั่งซื้อ (Detail) #<span class="text-info">{{ po.po_number }}</span>
       </h2>
-      <span
-        class="badge {% if po.status == 'Pending' %}bg-warning text-dark{% else %}bg-success{% endif %} mt-2 fs-6"
-      >
+      <span class="badge {% if po.status == 'Pending' %}bg-warning text-dark{% else %}bg-success{% endif %} mt-2 fs-6">
         {{ po.status }}
       </span>
     </div>
@@ -28,9 +24,7 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
   <input type="hidden" name="action" value="update_header" />
 
   <div class="card mb-4 shadow-sm border-secondary">
-    <div
-      class="card-header bg-dark border-secondary d-flex justify-content-between align-items-center"
-    >
+    <div class="card-header bg-dark border-secondary d-flex justify-content-between align-items-center">
       <h5 class="mb-0 text-white">
         <i class="bi bi-info-circle"></i> ข้อมูลทั่วไป (Header Info)
       </h5>
@@ -42,192 +36,78 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
     <div class="card-body bg-dark text-white">
       <!-- Row 1: Basic Info -->
       <div class="row g-3 mb-3">
-        <div class="col-md-3">
-          <label class="form-label text-muted small"
-            >เลข PO (PO Number) <span class="text-danger">*</span></label
-          >
-          <input
-            type="text"
-            name="po_number"
-            class="form-control bg-dark text-white border-secondary"
-            value="{{ po.po_number }}"
-            required
-            {% if po.status != "Pending" %}readonly{% endif %}
-          />
+        <div class="col-md-2">
+          <label class="form-label text-muted small">เลข PO (PO Number) <span class="text-danger">*</span></label>
+          <input type="text" name="po_number" class="form-control bg-dark text-white border-secondary"
+            value="{{ po.po_number }}" required {% if po.status != "Pending" %}readonly{% endif %} />
         </div>
-        <div class="col-md-3">
-          <label class="form-label text-muted small"
-            >วันที่สั่งซื้อ (Order Date)</label
-          >
-          <input
-            type="date"
-            name="order_date"
-            class="form-control bg-dark text-white border-secondary"
-            value="{{ po.order_date|date:'Y-m-d' }}"
-            {% if po.status != "Pending" %}readonly{% endif %}
-          />
+        <div class="col-md-2">
+          <label class="form-label text-muted small">วันที่สั่งซื้อ (Order Date)</label>
+          <input type="date" name="order_date" class="form-control bg-dark text-white border-secondary"
+            value="{{ po.order_date|date:'Y-m-d' }}" {% if po.status != "Pending" %}readonly{% endif %} />
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
           <label class="form-label text-muted small">ประเภท (Order Type)</label>
-          <select
-            name="order_type"
-            class="form-select bg-dark text-white border-secondary"
-            {% if po.status != "Pending" %}disabled{% endif %}
-          >
-            <option
-              value="IMPORTED"
-              {% if po.order_type == "IMPORTED" %}selected{% endif %}
-            >
+          <select name="order_type" class="form-select bg-dark text-white border-secondary" 
+            {% if po.status != "Pending" %} disabled {% endif %}>
+            <option value="IMPORTED" {% if po.order_type == "IMPORTED" %}selected{% endif %}>
               Imported (นำเข้า)
             </option>
-            <option
-              value="DOMESTIC"
-              {% if po.order_type == "DOMESTIC" %}selected{% endif %}
-            >
+            <option value="DOMESTIC" {% if po.order_type == "DOMESTIC" %}selected{% endif %}>
               Domestic (ในประเทศ)
             </option>
           </select>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
           <label class="form-label text-muted small">การขนส่ง (Shipping)</label>
-          <select
-            name="shipping_type"
-            class="form-select bg-dark text-white border-secondary"
-            {%
-            if
-            po.status
-            !="Pending"
-            %}disabled{%
-            endif
-            %}
-          >
+          <select name="shipping_type" class="form-select bg-dark text-white border-secondary" 
+            {% if po.status != "Pending" %} disabled {% endif %}>
             <option value="CAR" {% if po.shipping_type == "CAR" %}selected{% endif %}>Car (รถ)</option>
             <option value="SHIP" {% if po.shipping_type == "SHIP" %}selected{% endif %}>Ship (เรือ)</option>
             <option value="AIR" {% if po.shipping_type == "AIR" %}selected{% endif %}>Air (เครื่องบิน)</option>
           </select>
         </div>
-      </div>
-
-      <!-- Row 2: Metrics -->
-      <div class="row g-3 mb-3">
-        <div class="col-md-3">
-          <label class="form-label text-muted small"
-            >วันคาดการณ์ (Est. Date)</label
-          >
-          <input
-            type="date"
-            name="estimated_date"
-            class="form-control bg-dark text-white border-secondary"
-            value="{{ po.estimated_date|date:'Y-m-d'|default:'' }}"
-            {%
-            if
-            po.status
-            !="Pending"
-            %}readonly{%
-            endif
-            %}
-          />
+        <div class="col-md-2">
+          <label class="form-label text-muted small">วันคาดการณ์ (Est. Date)</label>
+          <input type="date" name="estimated_date" class="form-control bg-dark text-white border-secondary"
+            value="{{ po.estimated_date|date:'Y-m-d'|default:'' }}" />
         </div>
-        <div class="col-md-3">
-          <label class="form-label text-muted small"
-            >เรทเงิน (Exchange Rate)</label
-          >
-          <input
-            type="number"
-            step="0.01"
-            name="exchange_rate"
-            id="input_exchange_rate"
-            class="form-control bg-dark text-white border-secondary"
-            value="{{ po.exchange_rate }}"
-            oninput="calcTransportCost()"
-            {% if po.status != "Pending" %} {% endif %}
-          />
-        </div>
-        <div class="col-md-3">
-          <label class="form-label text-muted small"
-            >เรทค่าขนส่ง (¥/CBM)</label
-          >
-          <input
-            type="number"
-            step="0.01"
-            name="shipping_rate_yuan_per_cbm"
-            id="input_rate_yuan"
-            class="form-control bg-dark text-white border-secondary"
-            value="{{ po.shipping_rate_yuan_per_cbm }}"
-            oninput="calcTransportCost()"
-          />
-        </div>
-        <div class="col-md-3">
-            <label class="form-label text-muted small">รวมค่าขนส่ง (฿)</label>
-            <div class="input-group">
-                 <input type="text" id="input_transport_cost" class="form-control bg-dark text-white border-secondary" readonly value="{{ po.transportation_cost|floatformat:2 }} ฿">
-                 <span class="input-group-text bg-secondary text-white border-secondary small" style="font-size: 0.7em;" id="cbm_display" data-cbm="{{ po.total_cbm }}">
-                    (CBM: {{ po.total_cbm|floatformat:2 }})
-                 </span>
-            </div>
+        <div class="col-md-2">
+          <label class="form-label text-muted small">วันที่บิล (Bill Date)</label>
+          <input type="date" name="bill_date" class="form-control bg-dark text-white border-secondary"
+            value="{{ po.bill_date|date:'Y-m-d'|default:'' }}" />
         </div>
       </div>
-        </div>
-        
 
       <hr class="border-secondary opacity-50" />
+
+      <!-- Row 2: Supplier -->
       <h6 class="text-white mb-3 small opacity-75 px-3">
         ข้อมูลร้านค้า / อ้างอิงราคา (Supplier / Pricing Ref)
       </h6>
-
-      <!-- Row 3: Shop & Attachments -->
       <div class="row g-3 mb-3 px-3">
         <div class="col-md-4">
           <label class="form-label text-muted small">Link Shop</label>
-          <input
-            type="url"
-            name="link_shop"
-            class="form-control bg-dark text-white border-secondary"
-            placeholder="URL ร้านค้าจีน..."
-            value="{{ po.link_shop }}"
-            {%
-            if
-            po.status
-            !="Pending"
-            %}readonly{%
-            endif
-            %}
-          />
+          <input type="url" name="link_shop" class="form-control bg-dark text-white border-secondary"
+            placeholder="URL ร้านค้าจีน..." value="{{ po.link_shop }}" />
         </div>
         <div class="col-md-4">
           <label class="form-label text-muted small">WeChat / Contact</label>
-          <input
-            type="text"
-            name="wechat_contact"
-            class="form-control bg-dark text-white border-secondary"
-            value="{{ po.wechat_contact }}"
-            {% if po.status != "Pending" %}readonly{% endif %}
-          />
+          <input type="text" name="wechat_contact" class="form-control bg-dark text-white border-secondary"
+            value="{{ po.wechat_contact }}" />
         </div>
         <div class="col-md-4">
-          <label class="form-label text-muted small"
-            >แนบไฟล์ (Attach Files)</label
-          >
-          <input
-            type="file"
-            name="attachments"
-            multiple
-            class="form-control bg-dark text-white border-secondary"
-            {% if po.status != "Pending" %}disabled{% endif %}
-          />
+          <label class="form-label text-muted small">แนบไฟล์ (Attach Files)</label>
+          <input type="file" name="attachments" multiple class="form-control bg-dark text-white border-secondary" />
           <!-- Display Existing Attachments -->
           {% if po.attachments.exists %}
           <div class="mt-2">
             <small class="text-muted">ไฟล์ที่แนบแล้ว:</small>
             <div class="d-flex flex-wrap gap-2 mt-1">
               {% for file in po.attachments.all %}
-              <a
-                href="{{ file.file.url }}"
-                target="_blank"
-                class="badge bg-secondary text-decoration-none"
-              >
-                <i class="bi bi-paperclip"></i> 
-			{{ file.filename|truncatechars:15 }}
+              <a href="{{ file.file.url }}" target="_blank" class="badge bg-secondary text-decoration-none">
+                <i class="bi bi-paperclip"></i>
+                {{ file.filename|truncatechars:15 }}
               </a>
               {% endfor %}
             </div>
@@ -236,52 +116,55 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
         </div>
       </div>
 
-      <!-- Row 4: Pricing Refs & Note -->
+      <!-- Reference Prices -->
       <div class="row g-3 px-3 pb-3">
         <div class="col-md-3">
           <label class="form-label text-muted small">ราคา Shopee (Ref)</label>
-          <input
-            type="number"
-            step="0.01"
-            name="shopee_price"
-            class="form-control bg-dark text-white border-secondary"
-            value="{{ po.shopee_price|default:'' }}"
-            {% if po.status != "Pending" %}readonly{% endif %}
-          />
+          <input type="number" step="0.01" name="shopee_price" class="form-control bg-dark text-white border-secondary"
+            value="{{ po.ref_price_shopee|default:'' }}" />
         </div>
         <div class="col-md-3">
           <label class="form-label text-muted small">ราคา Lazada (Ref)</label>
-          <input
-            type="number"
-            step="0.01"
-            name="lazada_price"
-            class="form-control bg-dark text-white border-secondary"
-            value="{{ po.lazada_price|default:'' }}"
-            {% if po.status != "Pending" %}readonly{% endif %}
-          />
+          <input type="number" step="0.01" name="lazada_price" class="form-control bg-dark text-white border-secondary"
+            value="{{ po.ref_price_lazada|default:'' }}" />
         </div>
         <div class="col-md-3">
           <label class="form-label text-muted small">ราคา TikTok (Ref)</label>
-          <input
-            type="number"
-            step="0.01"
-            name="tiktok_price"
-            class="form-control bg-dark text-white border-secondary"
-            value="{{ po.tiktok_price|default:'' }}"
-            {% if po.status != "Pending" %}readonly{% endif %}
-          />
+          <input type="number" step="0.01" name="tiktok_price" class="form-control bg-dark text-white border-secondary"
+            value="{{ po.ref_price_tiktok|default:'' }}" />
         </div>
         <div class="col-md-3">
           <label class="form-label text-muted small">หมายเหตุ (Note)</label>
-          <input
-            type="text"
-            name="note"
-            class="form-control bg-dark text-white border-secondary"
-            value="{{ po.note }}"
-            {% if po.status != "Pending" %}readonly{% endif %}
-          />
+          <input type="text" name="note" class="form-control bg-dark text-white border-secondary"
+            value="{{ po.note }}" />
         </div>
       </div>
+
+      <hr class="border-secondary opacity-50" />
+
+      <!-- Row 3: Financial -->
+      <h6 class="text-white mb-3 small opacity-75 px-3">
+        ข้อมูลการเงิน (Financial)
+      </h6>
+      <div class="row g-3 mb-3 px-3">
+        <div class="col-md-4">
+          <label class="form-label text-muted small">เรทเงิน (Exchange Rate)</label>
+          <input type="number" step="0.0001" name="exchange_rate" id="input_exchange_rate"
+            class="form-control bg-dark text-white border-secondary" value="{{ po.exchange_rate }}" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label text-muted small">เรทค่าขนส่ง (บาท/คิว)</label>
+          <input type="number" step="0.01" name="shipping_rate_thb_cbm"
+            class="form-control bg-dark text-white border-secondary" value="{{ po.shipping_rate_thb_cbm }}" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label text-muted small">ยอดหยวนรวม (Total Yuan)</label>
+          <input type="number" step="0.01" name="total_yuan"
+            class="form-control bg-dark text-white border-secondary fw-bold text-success" value="{{ po.total_yuan }}" />
+          <small class="text-muted">แก้ไขค่านี้ระบบจะเฉลี่ยต้นทุนใหม่ (Triggers Proration)</small>
+        </div>
+      </div>
+
     </div>
   </div>
 </form>
@@ -289,239 +172,174 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
 <!-- Items Table Form -->
 <form method="post" id="itemsForm">
   {% csrf_token %}
-  <input type="hidden" name="action" value="receive_items" />
+  <input type="hidden" name="action" value="update_items" />
 
   <div class="card shadow-sm border-secondary">
-    <div
-      class="card-header bg-dark border-secondary d-flex justify-content-between align-items-center"
-    >
+    <div class="card-header bg-dark border-secondary d-flex justify-content-between align-items-center">
       <h5 class="mb-0 text-white">
         <i class="bi bi-list-check"></i> รายการสินค้า (Items)
       </h5>
 
-      <!-- Allow receiving always, logic handles completion -->
-      <div
-        class="d-flex flex-wrap align-items-end justify-content-between gap-3"
-      >
-        <!-- Date & Receive Action -->
-        <div class="d-flex gap-2 align-items-center">
-          <div class="input-group input-group-sm" style="width: auto">
-            <span
-              class="input-group-text bg-secondary text-white border-secondary"
-            >
-              <i class="bi bi-calendar3 me-1"></i> วันที่รับ
-            </span>
-            <input
-              type="date"
-              name="receive_date"
-              class="form-control bg-dark text-white border-secondary"
-              value="{% now 'Y-m-d' %}"
-            />
-          </div>
-
-          <button
-            type="submit"
-            name="action"
-            value="update_items"
-            class="btn btn-sm btn-primary fw-bold text-nowrap px-3 shadow-sm"
-          >
-            <i class="bi bi-save me-1"></i> บันทึกแก้ไขรายการสินค้า
-          </button>
-        </div>
-
+      <!-- Top Inputs Removed (Moved to Table) -->
+      <div class="d-flex gap-2 align-items-end">
+        {% comment %} <span class="text-muted small">บันทึกจำนวนรับเข้าสินค้า</span> {% endcomment %}
+        <button type="submit" class="btn btn-sm btn-primary text-nowrap px-3 shadow-sm">
+          <i class="bi bi-save me-1"></i> บันทึกการแก้ไขสินค้า (Items)
+        </button>
         <!-- Add Item Button -->
-        <button
-          type="button"
-          class="btn btn-sm btn-outline-warning text-nowrap"
-          data-bs-toggle="modal"
-          data-bs-target="#addItemModal"
-        >
+        <button type="button" class="btn btn-sm btn-outline-warning text-nowrap" data-bs-toggle="modal"
+          data-bs-target="#addItemModal">
           <i class="bi bi-plus-lg me-1"></i> เพิ่มสินค้า
         </button>
-
-        <!-- History Button -->
-        <button
-          type="button"
-          class="btn btn-sm btn-outline-info text-nowrap"
-          data-bs-toggle="modal"
-          data-bs-target="#historyModal"
-        >
-          <i class="bi bi-clock-history me-1"></i> ประวัติการรับเข้า
-        </button>
       </div>
     </div>
+  </div>
 
-    <div class="card-body p-0">
-      <div class="table-responsive">
-        <table class="table table-dark table-hover align-middle mb-0">
-          <thead>
-            <tr class="text-center align-middle">
-              <th rowspan="2" style="width: 40px">
-                <input type="checkbox" id="selectAll" />
-              </th>
-              <th rowspan="2" style="width: 60px">รูปสินค้า</th>
-              <th rowspan="2">SKU / Name</th>
-              <th rowspan="2" class="text-end">ราคา (¥)</th>
-              <th rowspan="2" class="text-end">รวม (฿)</th>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-dark table-hover align-middle mb-0 table-bordered" style="border-color: #444;">
+        <thead>
+          <tr class="text-center align-middle">
+            <th rowspan="3" class="bg-secondary bg-opacity-10" style="width: 100px">รูป</th>
+            <th rowspan="3" class="bg-secondary bg-opacity-10">รหัสสินค้า / ชื่อสินค้า</th>
+            <th rowspan="3" class="bg-secondary bg-opacity-10" style="width: 100px">จำนวนสั่ง</th>
 
-              <!-- Ordered Group -->
-              <th
-                colspan="3"
-                class="bg-success text-white border-bottom border-light"
-              >
-                Ordered (สั่งซื้อ)
-              </th>
-              <!-- Received Group -->
-              <th
-                colspan="3"
-                class="bg-info text-dark border-bottom border-light"
-              >
-                Received (รับแล้ว)
-              </th>
-              <!-- Input Group -->
-              <th
-                colspan="3"
-                class="bg-dark text-white border-bottom border-light"
-              >
-                Receive Now (รับครั้งนี้)
-              </th>
-              <th rowspan="2" style="width: 50px"></th>
-            </tr>
-            <tr class="text-center small">
-              <!-- Ordered Subcols -->
-              <th class="bg-success text-white" style="width: 90px">Qty</th>
-              <th class="bg-success text-white" style="width: 90px">คิว</th>
-              <th class="bg-success text-white" style="width: 90px">Kg</th>
+            <th rowspan="3" class="bg-success bg-opacity-25 border-success text-white" style="width: 120px">
+              <div class="fw-bold">รวม</div>
+              <div class="small">จำนวนรับเข้า</div>
+            </th>
 
-              <!-- Received Subcols -->
-              <th class="bg-info text-dark" style="width: 90px">Qty</th>
-              <th class="bg-info text-dark" style="width: 90px">คิว</th>
-              <th class="bg-info text-dark" style="width: 90px">Kg</th>
+            {% for col in batch_columns %}
+            <th colspan="3" class="border-bottom-0"
+              style="min-width: 200px; background-color: {% if col.no|divisibleby:2 %}#1a3d3d{% else %}#2c3e50{% endif %};">
+              <div class="fw-bold text-info mb-1">รอบที่ {{ col.no }}</div>
 
-              <!-- Input Subcols -->
-              <th class="bg-dark text-white" style="width: 90px">Qty</th>
-              <th class="bg-dark text-white" style="width: 90px">คิว</th>
-              <th class="bg-dark text-white" style="width: 90px">Kg</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for item in po.items.all %}
-            <tr>
-              <td>
-                {% if item.qty_ordered > item.total_received_qty %}
-                <input
-                  type="checkbox"
-                  class="item-check"
-                  id="chk_{{ item.id }}"
-                  data-remaining="{{ item.remaining_qty }}"
-                  onchange="onCheckboxChange('{{ item.id }}')"
-                />
-                {% endif %}
-              </td>
-              <td>
-                {% if item.sku.image %}
-                <img
-                  src="{{ item.sku.image.url }}"
-                  style="height: 60px"
-                  class="rounded"
-                />
-                {% endif %}
-              </td>
-              <td class="text-center">
-                <div class="fw-bold">{{ item.sku.product_code }}</div>
-                <div class="small text-muted">
-                  {{ item.sku.name|truncatechars:30 }}
+              <div class="d-flex flex-column gap-1 mb-1">
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text bg-secondary text-white border-0"
+                    style="font-size: 10px; width: 35px;">Bill</span>
+                  <input type="date" name="batch_{{ col.no }}_bill_date"
+                    value="{{ col.obj.bill_date|date:'Y-m-d'|default:'' }}"
+                    class="form-control bg-dark text-white border-secondary p-1" style="font-size: 0.75rem;">
                 </div>
-              </td>
-              <td class="text-end">{{ item.price_yuan }}</td>
-              <td class="text-end">{{ item.price_baht|intcomma }}</td>
-
-              <!-- Ordered Data -->
-              <!-- Ordered Data (Editable) -->
-              <!-- Ordered Data (Editable) -->
-              <td class="p-1 bg-success bg-opacity-25">
-                <input type="number" name="qty_ordered_{{ item.id }}" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="{{ item.qty_ordered }}" min="0">
-              </td>
-              <td class="p-1 bg-success bg-opacity-25">
-                 <input type="number" step="0.0001" name="cbm_{{ item.id }}" class="form-control form-control-sm bg-dark text-white border-secondary text-center item-cbm-input" value="{{ item.cbm|default_if_none:0 }}" oninput="recalcTotalCBM()">
-              </td>
-              <td class="p-1 bg-success bg-opacity-25">
-                <input type="number" step="0.01" name="weight_{{ item.id }}" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="{{ item.weight|default_if_none:0 }}">
-              </td>
-
-              <!-- Received Data -->
-              <td class="text-center bg-info bg-opacity-25 fw-bold">
-                {{ item.total_received_qty|intcomma }}
-              </td>
-              <td class="text-center bg-info bg-opacity-25">
-                {{ item.total_received_cbm|floatformat:2|default_if_none:"-" }}
-              </td>
-              <td class="text-center bg-info bg-opacity-25">
-                {{ item.total_received_weight|floatformat:2|default_if_none:"-" }}
-              </td>
-
-              <!-- Input Data: Disable Enter Key -->
-              <td class="bg-secondary bg-opacity-25" style="width: 90px">
-                {% if item.qty_ordered > item.total_received_qty %}
-                <input
-                  type="number"
-                  name="receive_qty_{{ item.id }}"
-                  id="qty_{{ item.id }}"
-                  class="form-control form-control-sm bg-dark text-white border-secondary text-center"
-                  data-remaining="{{ item.remaining_qty }}"
-                  oninput="onInputChange('{{ item.id }}')"
-                  onkeydown="return event.key != 'Enter';"
-                  placeholder="0"
-                />
-                {% else %}
-                <span class="badge bg-success w-100">Complete</span>
-                {% endif %}
-              </td>
-              <td class="bg-secondary bg-opacity-25">
-                <input
-                  type="number"
-                  step="0.0001"
-                  name="receive_cbm_{{ item.id }}"
-                  class="form-control form-control-sm bg-dark text-white border-secondary text-center"
-                  onkeydown="return event.key != 'Enter';"
-                  placeholder="0"
-                />
-              </td>
-              <td class="bg-secondary bg-opacity-25">
-                <input
-                  type="number"
-                  step="0.01"
-                  name="receive_weight_{{ item.id }}"
-                  class="form-control form-control-sm bg-dark text-white border-secondary text-center"
-                  onkeydown="return event.key != 'Enter';"
-                  placeholder="0"
-                />
-              </td>
-              <td class="text-center">
-                  <button type="submit" name="action" value="delete_item_{{ item.id }}" class="btn btn-sm btn-link text-danger p-0" onclick="return confirm('ลบรายการนี้?');" title="Delete">
-                      <i class="bi bi-x-lg"></i>
-                  </button>
-              </td>
-            </tr>
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text bg-secondary text-white border-0"
+                    style="font-size: 10px; width: 35px;">รับ</span>
+                  <input type="date" name="batch_{{ col.no }}_recv_date"
+                    value="{{ col.obj.received_date|date:'Y-m-d'|default:'' }}"
+                    class="form-control bg-dark text-white border-secondary p-1" style="font-size: 0.75rem;">
+                </div>
+              </div>
+            </th>
             {% endfor %}
-          </tbody>
-        </table>
-      </div>
+          </tr>
+
+          <tr class="text-center">
+            {% for col in batch_columns %}
+            <th colspan="3" class="p-1 border-top-0"
+              style="background-color: {% if col.no|divisibleby:2 %}#1a3d3d{% else %}#2c3e50{% endif %};">
+              <div class="d-flex gap-1">
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text bg-dark text-muted border-secondary px-1"
+                    style="font-size: 9px;">คิว</span>
+                  <input type="number" step="0.0001" name="batch_{{ col.no }}_total_cbm"
+                    value="{{ col.obj.total_cbm|default:'' }}"
+                    class="form-control bg-dark text-white border-secondary p-1 text-center" placeholder="0">
+                </div>
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text bg-dark text-muted border-secondary px-1"
+                    style="font-size:9px;">KG</span>
+                  <input type="number" step="0.01" name="batch_{{ col.no }}_total_kg"
+                    value="{{ col.obj.total_weight|default:'' }}"
+                    class="form-control bg-dark text-white border-secondary p-1 text-center" placeholder="0">
+                </div>
+              </div>
+            </th>
+            {% endfor %}
+          </tr>
+
+          <tr class="text-center small text-muted" style="font-size: 0.65rem;">
+            {% for col in batch_columns %}
+            <th class="border-secondary"
+              style="width: 70px; background-color: {% if col.no|divisibleby:2 %}#1a3d3d{% else %}#2c3e50{% endif %};">
+              จำนวน</th>
+            <th class="border-secondary"
+              style="width: 65px; background-color: {% if col.no|divisibleby:2 %}#1a3d3d{% else %}#2c3e50{% endif %};">
+              คิว</th>
+            <th class="border-secondary"
+              style="width: 65px; background-color: {% if col.no|divisibleby:2 %}#1a3d3d{% else %}#2c3e50{% endif %};">
+              KG</th>
+            {% endfor %}
+          </tr>
+        </thead>
+
+        <tbody>
+          {% for item in items %}
+          <tr>
+            <td class="text-center">
+              {% if item.sku.image %}
+              <img src="{{ item.sku.image.url }}" style="height: 80px; width: 80px; object-fit: cover;"
+                class="rounded border border-secondary" />
+              {% else %}
+              <div class="bg-secondary rounded " style="height: 80px; width: 80px;"></div>
+              {% endif %}
+            </td>
+            <td>
+              <div class="fw-bold small text-info">{{ item.sku.product_code }}</div>
+              <div class="small text-muted" style="font-size: 0.7rem;">{{ item.sku.name|truncatechars:25 }}</div>
+            </td>
+            <td class="text-center bg-secondary bg-opacity-10">
+              <div class="fw-bold">{{ item.qty_ordered }}</div>
+              <div class="text-warning" style="font-size: 0.7rem;">Left: {{ item.remaining_qty }}</div>
+            </td>
+
+            <td class="bg-success bg-opacity-10 border-success p-2">
+              <div
+                class="d-flex justify-content-between small text-white border-bottom border-success border-opacity-25 mb-1">
+                <span>จำนวน:</span> <span class="badge bg-success px-1">{{ item.sum_qty }}</span>
+              </div>
+              <div
+                class="d-flex justify-content-between small text-white border-bottom border-success border-opacity-25 mb-1">
+                <span>คิว:</span> <span class="fw-bold">{{ item.sum_cbm|floatformat:2 }}</span>
+              </div>
+              <div class="d-flex justify-content-between small text-white mb-1">
+                <span>KG:</span> <span class="fw-bold">{{ item.sum_weight|floatformat:2 }}</span>
+              </div>
+            </td>
+
+            {% for val in item.batch_values %}
+            {% with bg_color=forloop.counter|divisibleby:2|yesno:"#1a2a2a,#252525" %}
+
+            <td class="p-1" style="background-color: {{ bg_color }};">
+              <input type="number" name="receive_qty_{{ item.id }}_{{ forloop.counter }}"
+                class="form-control form-control-sm bg-dark text-white border-secondary text-center px-1"
+                value="{{ val.qty }}" min="0" placeholder="0">
+            </td>
+
+            <td class="text-center p-1" style="background-color: {{ bg_color }};">
+              <span class="text-muted" style="font-size: 0.7rem;">
+                {{ val.cbm|floatformat:2|default:"-" }}
+              </span>
+            </td>
+
+            <td class="text-center p-1" style="background-color: {{ bg_color }};">
+              <span class="text-muted" style="font-size: 0.7rem;">
+                {{ val.weight|floatformat:2|default:"-" }}
+              </span>
+            </td>
+
+            {% endwith %}
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
+  </div>
   </div>
 </form>
 
 <script>
-  // When checkbox changes
-  function calcTransportCost() {
-      const exRate = parseFloat(document.getElementById('input_exchange_rate').value) || 0;
-      const yuanRate = parseFloat(document.getElementById('input_rate_yuan').value) || 0;
-      const totalCbm = parseFloat(document.getElementById('cbm_display').getAttribute('data-cbm')) || 0;
-      
-      const totalBaht = totalCbm * yuanRate * exRate;
-      document.getElementById('input_transport_cost').value = totalBaht.toFixed(2) + " ฿";
-  }
-
   function onCheckboxChange(itemId) {
     const checkbox = document.getElementById("chk_" + itemId);
     const input = document.getElementById("qty_" + itemId);
@@ -536,7 +354,6 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
     }
   }
 
-  // When input changes
   function onInputChange(itemId) {
     const checkbox = document.getElementById("chk_" + itemId);
     const input = document.getElementById("qty_" + itemId);
@@ -549,7 +366,6 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
     }
   }
 
-  // Select All
   document.getElementById("selectAll").addEventListener("change", function () {
     const checkboxes = document.querySelectorAll(".item-check");
     checkboxes.forEach((cb) => {
@@ -560,21 +376,55 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
   });
 </script>
 
+<!-- Add Item Modal -->
+<div class="modal fade" id="addItemModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content bg-dark text-white border-secondary">
+      <form method="POST">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_item">
+
+        <div class="modal-header border-secondary">
+          <h5 class="modal-title">เพิ่มสินค้า (Add Item)</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Search SKU / Name</label>
+            <input type="text" name="sku_code" class="form-control bg-dark text-white border-secondary"
+              placeholder="Enter SKU" required list="skuOptions">
+            <datalist id="skuOptions">
+              {% for m in master_items %}
+              <option value="{{ m.product_code }}">{{ m.name }}</option>
+              {% endfor %}
+            </datalist>
+          </div>
+          <div class="row">
+            <div class="col-4">
+              <label class="form-label">Qty</label>
+              <input type="number" name="new_qty" class="form-control bg-dark text-white border-secondary" value="1"
+                min="1" required>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer border-secondary">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="submit" class="btn btn-primary">Add Item</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <!-- History Modal -->
 <div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-xl">
     <div class="modal-content bg-dark text-white border-secondary">
       <div class="modal-header border-secondary">
         <h5 class="modal-title">
-          <i class="bi bi-clock-history"></i> ประวัติการรับสินค้า (Receiving
-          History)
+          <i class="bi bi-clock-history"></i> ประวัติการรับสินค้า (Receiving History)
         </h5>
-        <button
-          type="button"
-          class="btn-close btn-close-white"
-          data-bs-dismiss="modal"
-          aria-label="Close"
-        ></button>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
         <div class="table-responsive">
@@ -591,114 +441,38 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
               </tr>
             </thead>
             <tbody>
-              {% for item in po.items.all %} 
-		{% for receipt in item.receipts.all %}
+              {% for item in po.items.all %}
+              {% for receipt in item.receipts.all %}
               <tr>
                 <td>{{ receipt.received_date|date:"d/m/Y" }}</td>
                 <td class="fw-bold">{{ item.sku.product_code }}</td>
                 <td>{{ item.sku.name|truncatechars:40 }}</td>
                 <td class="text-end">{{ receipt.received_qty }}</td>
                 <td class="text-end">
-                  {{ receipt.received_cbm|floatformat:2 }}
+                  {{ receipt.received_cbm|floatformat:4 }}
                 </td>
                 <td class="text-end">
                   {{ receipt.received_weight|floatformat:2 }}
                 </td>
                 <td class="text-center">
-                    <form action="{% url 'delete_received_item' receipt.id %}" method="post" onsubmit="return confirm('ยืนยันลบประวัติการรับสินค้านี้?');">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-sm btn-danger px-2 py-0"><i class="bi bi-trash"></i></button>
-                    </form>
+                  <form action="{% url 'delete_received_item' receipt.id %}" method="post"
+                    onsubmit="return confirm('ยืนยันลบประวัติการรับสินค้านี้?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-danger px-2 py-0"><i class="bi bi-trash"></i></button>
+                  </form>
                 </td>
               </tr>
-              {% endfor %} 
-		{% endfor %}
+              {% endfor %}
+              {% endfor %}
             </tbody>
           </table>
         </div>
       </div>
       <div class="modal-footer border-secondary">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-          ปิด
-        </button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ปิด</button>
       </div>
     </div>
   </div>
 </div>
 
-
-
-<!-- Add Item Modal -->
-<div class="modal fade" id="addItemModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content bg-dark text-white border-secondary">
-        <form method="POST">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="add_item">
-          
-          <div class="modal-header border-secondary">
-            <h5 class="modal-title">เพิ่มสินค้า (Add Item)</h5>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-              <div class="mb-3">
-                  <label class="form-label">Search SKU / Name</label>
-                  <input type="text" name="sku_code" class="form-control bg-dark text-white border-secondary" placeholder="Enter SKU" required list="skuOptions">
-                  <datalist id="skuOptions">
-                      {% for m in master_items %}
-                      <option value="{{ m.product_code }}">{{ m.name }}</option>
-                      {% endfor %}
-                  </datalist>
-              </div>
-              <div class="row">
-                  <div class="col-4">
-                      <label class="form-label">Qty</label>
-                      <input type="number" name="new_qty" class="form-control bg-dark text-white border-secondary" value="1" min="1" required>
-                  </div>
-                  <div class="col-4">
-                      <label class="form-label">CBM</label>
-                      <input type="number" step="0.0001" name="new_cbm" class="form-control bg-dark text-white border-secondary" value="0">
-                  </div>
-                  <div class="col-4">
-                      <label class="form-label">Weight</label>
-                      <input type="number" step="0.01" name="new_weight" class="form-control bg-dark text-white border-secondary" value="0">
-                  </div>
-              </div>
-               <div class="row mt-2">
-                  <div class="col-6">
-                      <label class="form-label">Price (Yuan)</label>
-                      <input type="number" step="0.01" name="new_price_yuan" class="form-control bg-dark text-white border-secondary" value="0">
-                  </div>
-              </div>
-          </div>
-          <div class="modal-footer border-secondary">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            <button type="submit" class="btn btn-primary">Add Item</button>
-          </div>
-        </form>
-    </div>
-  </div>
-</div>
-
-<script>
-  // Recalculate total CBM from inputs
-  function recalcTotalCBM() {
-      let total = 0;
-      document.querySelectorAll('.item-cbm-input').forEach(input => {
-          total += parseFloat(input.value) || 0;
-      });
-      
-      // Update Display and Data Attribute
-      const display = document.getElementById('cbm_display');
-      if(display) {
-          display.setAttribute('data-cbm', total);
-          display.innerText = `(CBM: ${total.toFixed(2)})`;
-      }
-      
-      // Trigger cost recalc
-      if (typeof calcTransportCost === "function") {
-          calcTransportCost();
-      }
-  }
-</script>
 {% endblock %}

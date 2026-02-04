@@ -1,9 +1,6 @@
 {% load humanize %}
 <div class="table-responsive">
-  <table
-    class="table table-dark table-bordered table-sm text-nowrap align-middle"
-    style="font-size: 0.85rem"
-  >
+  <table class="table table-dark table-bordered table-sm text-nowrap align-middle" style="font-size: 0.85rem">
     <thead>
       <tr class="text-center align-middle bg-primary text-white">
         <th>รหัสสินค้า</th>
@@ -37,95 +34,90 @@
     <tbody>
       {% for row in history_items %}
       <tr>
-        <td class="fw-bold text-center">{{ row.item.sku.product_code }}</td>
+        <td class="fw-bold text-center">{{ row.po_item.sku.product_code }}</td>
         <td class="text-center">
-          {% if row.item.sku.image %}
-          <img
-            src="{{ row.item.sku.image.url }}"
-            style="height: 30px; width: auto"
-            class="rounded"
-          />
+          {% if row.po_item.sku.image %}
+          <img src="{{ row.po_item.sku.image.url }}" style="height: 30px; width: auto" class="rounded" />
           {% endif %}
         </td>
         <td class="text-center">
-          {% if row.item.header.status == 'Pending' %}
+          {% if row.po_item.header.status == 'Pending' %}
           <span class="badge bg-warning text-dark">รอจัดส่ง</span>
-          {% elif row.item.header.status == 'Complete' %}
+          {% elif row.po_item.header.status == 'Complete' %}
           <span class="badge bg-success">เรียบร้อย</span>
           {% else %}
-          <span class="badge bg-secondary">{{ row.item.header.status }}</span>
+          <span class="badge bg-secondary">{{ row.po_item.header.status }}</span>
           {% endif %}
         </td>
-        <td class="text-center">{{ row.item.header.po_number }}</td>
+        <td class="text-center">{{ row.po_item.header.po_number }}</td>
         <td class="text-center">
-          {{ row.item.header.get_order_type_display }}
+          {{ row.po_item.header.get_order_type_display }}
         </td>
         <td class="text-center">
-          {{ row.item.header.order_date|date:"d/m/Y" }}
+          {{ row.po_item.header.order_date|date:"d/m/Y" }}
         </td>
         <td class="text-center">
-          {{ row.item.header.estimated_date|date:"d/m/Y"|default:"-" }}
+          {{ row.po_item.header.estimated_date|date:"d/m/Y"|default:"-" }}
         </td>
         <td class="text-center">
           {{ row.received_date|date:"d/m/Y"|default:"-" }}
         </td>
         <td class="text-center">
-          {% if row.duration_from_order %} {{ row.duration_from_order }} วัน {%
-          else %} - {% endif %}
+          {% if row.duration_from_order %}
+          {{ row.duration_from_order }} วัน
+          {% else %}
+          -
+          {% endif %}
         </td>
         <td class="text-end text-success fw-bold">
-          {{ row.item.total_received_qty|intcomma }}
+          {{ row.received_qty|intcomma }}
         </td>
-        <td class="text-end">{{ row.item.qty_ordered|intcomma }}</td>
+        <td class="text-end">{{ row.po_item.qty_ordered|intcomma }}</td>
         <td class="text-end">{{ row.cost_per_piece|floatformat:2 }}</td>
         <td class="text-end">{{ row.total_yuan|floatformat:2 }}</td>
-        <td class="text-end">{{ row.item.price_baht|floatformat:2 }}</td>
+        <td class="text-end">{{ row.po_item.price_baht|floatformat:2 }}</td>
         <td class="text-end">
-          {{ row.item.header.exchange_rate|floatformat:2 }}
+          {{ row.po_item.header.exchange_rate|floatformat:2 }}
         </td>
-        <td class="text-end">-</td>
-        <!-- Shipping Rate? -->
-        <td class="text-end">{{ row.item.cbm|floatformat:2|default:"-" }}</td>
+        <td class="text-end">{{ row.po_item.header.shipping_rate_thb_cbm|floatformat:2 }}</td>
+
+        <td class="text-end">{{ row.received_cbm|floatformat:4|default:"-" }}</td>
+
+        <!-- Shipping Cost (Calculated or Approx) -->
         <td class="text-end">
-          {{ row.item.header.shipping_cost_baht|floatformat:2 }}
+          {% widthratio row.received_cbm 1 row.po_item.header.shipping_rate_thb_cbm %}
         </td>
+
         <td class="text-end">
-          {{ row.item.weight|floatformat:2|default:"-" }}
+          {{ row.received_weight|floatformat:2|default:"-" }}
         </td>
-        <td class="text-end">{{ row.item.price_yuan|floatformat:2 }}</td>
+        <td class="text-end">{{ row.po_item.price_yuan|floatformat:2 }}</td>
 
         <!-- Platform Prices -->
         <td class="text-end">
-          {{ row.item.header.shopee_price|floatformat:2|default:"-" }}
+          {{ row.po_item.header.ref_price_shopee|floatformat:2|default:"-" }}
         </td>
         <td class="text-end">
-          {{ row.item.header.lazada_price|floatformat:2|default:"-" }}
+          {{ row.po_item.header.ref_price_lazada|floatformat:2|default:"-" }}
         </td>
         <td class="text-end">
-          {{ row.item.header.tiktok_price|floatformat:2|default:"-" }}
+          {{ row.po_item.header.ref_price_tiktok|floatformat:2|default:"-" }}
         </td>
 
-        <td>{{ row.item.header.note|default:"-" }}</td>
+        <td>{{ row.po_item.header.note|default:"-" }}</td>
         <td>
-          {% if row.item.header.link_shop %}
-          <a
-            href="{{ row.item.header.link_shop }}"
-            target="_blank"
-            class="text-info"
-            ><i class="bi bi-link-45deg"></i> Link</a
-          >
+          {% if row.po_item.header.link_shop %}
+          <a href="{{ row.po_item.header.link_shop }}" target="_blank" class="text-info"><i
+              class="bi bi-link-45deg"></i>
+            Link</a>
           {% else %} - {% endif %}
         </td>
         <td class="text-center">
-          <form
-            action="{% url 'delete_received_item' row.id %}"
-            method="post"
-            onsubmit="
+          <form action="{% url 'delete_received_item' row.id %}" method="post" onsubmit="
               return confirm(
                 'ยืนยันลบประวัติการรับสินค้านี้? ข้อมูลจำนวนคงเหลือจะถูกคำนวณใหม่',
               );
-            "
-          >
+            ">
             {% csrf_token %}
             <button type="submit" class="btn btn-sm btn-danger px-2 py-0">
               <i class="bi bi-trash"></i>

@@ -6,24 +6,11 @@ JST System{% endblock %} {% block content %}
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title fs-6" id="copyModalTitle">Copy Data</h5>
-        <button
-          type="button"
-          class="btn-close"
-          data-bs-dismiss="modal"
-          aria-label="Close"
-        ></button>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body text-center">
-        <input
-          type="text"
-          class="form-control mb-2 text-center"
-          id="copyInput"
-          readonly
-        />
-        <button
-          class="btn btn-primary btn-sm w-100"
-          onclick="copyToClipboard()"
-        >
+        <input type="text" class="form-control mb-2 text-center" id="copyInput" readonly />
+        <button class="btn btn-primary btn-sm w-100" onclick="copyToClipboard()">
           <i class="bi bi-clipboard"></i> คัดลอก
         </button>
       </div>
@@ -43,86 +30,33 @@ JST System{% endblock %} {% block content %}
       <form method="get" class="row g-3">
         <div class="col-md-2">
           <label class="form-label">เลข PO</label>
-          <input
-            type="text"
-            name="po_number"
-            class="form-control"
-            value="{{ po_number_query }}"
-            placeholder="ระบุเลข PO..."
-          />
+          <input type="text" name="po_number" class="form-control" value="{{ po_number_query }}"
+            placeholder="ระบุเลข PO..." />
         </div>
         <div class="col-md-2">
           <label class="form-label">SKU / ชื่อสินค้า</label>
-          <input
-            type="text"
-            name="search"
-            class="form-control"
-            value="{{ search_query }}"
-            placeholder="ค้นหา..."
-          />
+          <input type="text" name="search" class="form-control" value="{{ search_query }}" placeholder="ค้นหา..." />
         </div>
         <div class="col-md-2">
           <label class="form-label">สถานะ</label>
           <select name="status" class="form-select">
             <option value="">ทั้งหมด (All)</option>
-            <option
-              value="arriving_soon"
-              {%
-              if
-              status_filter=""
-              ="arriving_soon"
-              %}selected{%
-              endif
-              %}
-            >
+            <option value="Pending" {% if status_filter == "Pending" %}selected{% endif %}>
+              รอส่ง (Pending)
+            </option>
+            <option value="arriving_soon" {% if status_filter == "arriving_soon" %}selected{% endif %}>
               สินค้าใกล้ถึง
             </option>
-            <option
-              value="waiting_shipment"
-              {%
-              if
-              status_filter=""
-              ="waiting_shipment"
-              %}selected{%
-              endif
-              %}
-            >
+            <option value="waiting_shipment" {% if status_filter == "waiting_shipment" %}selected{% endif %}>
               รอจัดส่ง
             </option>
-            <option
-              value="incomplete"
-              {%
-              if
-              status_filter=""
-              ="incomplete"
-              %}selected{%
-              endif
-              %}
-            >
+            <option value="incomplete" {% if status_filter == "incomplete" %}selected{% endif %}>
               สินค้าไม่ครบ
             </option>
-            <option
-              value="Complete"
-              {%
-              if
-              status_filter=""
-              ="Complete"
-              %}selected{%
-              endif
-              %}
-            >
+            <option value="Complete" {% if status_filter == "Complete" %}selected{% endif %}>
               เรียบร้อย
             </option>
-            <option
-              value="overdue"
-              {%
-              if
-              status_filter=""
-              ="overdue"
-              %}selected{%
-              endif
-              %}
-            >
+            <option value="overdue" {% if status_filter == "overdue" %}selected{% endif %}>
               เลยกำหนดจัดส่ง
             </option>
           </select>
@@ -130,23 +64,16 @@ JST System{% endblock %} {% block content %}
         <div class="col-md-2">
           <label class="form-label">หมวดหมู่สินค้า</label>
           <select name="category" class="form-select">
-            <option value="" {% if not selected_category %}selected{% endif %}>
+            <option value="" {% if not selected_category %} selected {% endif %}>
               แสดงทั้งหมด
             </option>
-            {% for cat in categories %} {% if cat %}
-            <option
-              value="{{ cat }}"
-              {%
-              if
-              cat=""
-              ="selected_category"
-              %}selected{%
-              endif
-              %}
-            >
+            {% for cat in categories %}
+            {% if cat %}
+            <option value="{{ cat }}" {% if cat == "selected_category" %} selected {% endif %}>
               {{ cat }}
             </option>
-            {% endif %} {% endfor %}
+            {% endif %}
+            {% endfor %}
           </select>
         </div>
         <div class="col-md-1 d-flex align-items-end">
@@ -166,10 +93,7 @@ JST System{% endblock %} {% block content %}
     <div class="card shadow-sm">
       <div class="card-body p-0">
         <div class="table-responsive">
-          <table
-            class="table table-hover table-striped align-middle mb-0"
-            style="font-size: 0.85rem"
-          >
+          <table class="table table-hover table-striped align-middle mb-0" style="font-size: 0.85rem">
             <thead class="text-nowrap text-center text-white">
               <tr>
                 <th class="bg-dark">แก้ไข</th>
@@ -182,11 +106,12 @@ JST System{% endblock %} {% block content %}
                 <!-- Dates - Purple -->
                 <th style="background-color: #6f42c1">วันที่สั่งซื้อ</th>
                 <th style="background-color: #6f42c1">วันคาดการณ์</th>
-                <th style="background-color: #6f42c1">วันที่ได้รับ</th>
+                <th style="background-color: #6f42c1">วันที่บิล (ล่าสุด)</th>
+                <th style="background-color: #6f42c1">วันที่รับ (ล่าสุด)</th>
                 <th style="background-color: #6f42c1">ระยะเวลา</th>
 
                 <!-- Received - Purple/Dark -->
-                <th style="background-color: #6f42c1">รับแล้ว</th>
+                <th style="background-color: #6f42c1">รับแล้ว (ชิ้น)</th>
 
                 <!-- Ordered/Cost - Green -->
                 <th style="background-color: #198754">สั่งซื้อ</th>
@@ -208,212 +133,203 @@ JST System{% endblock %} {% block content %}
 
                 <th class="bg-dark">หมายเหตุ</th>
 
-                <!-- New Columns -->
+                <!-- Extra Info -->
                 <th class="bg-dark">เอกสารแนบ</th>
-                <th class="bg-dark">ลิงค์ร้านค้า</th>
-                <th class="bg-dark">WeChat / Contact</th>
+                <th class="bg-dark">ร้านค้า</th>
+                <th class="bg-dark">ติดต่อ</th>
               </tr>
             </thead>
             <tbody>
               {% for item in po_items %}
               <tr>
-                <!-- Edit -->
+                <!-- 1. Edit -->
                 <td class="text-center">
-                  <a
-                    href="{% url 'po_detail' item.header.id %}"
-                    class="btn btn-sm btn-outline-warning border-0 p-0 text-warning"
-                    title="Edit"
-                  >
+                  <a href="{% url 'po_detail' item.header.id %}"
+                    class="btn btn-sm btn-outline-warning border-0 p-0 text-warning" title="Edit">
                     <i class="bi bi-pencil-square"></i>
                   </a>
                 </td>
 
-                <!-- SKU -->
+                <!-- 2. SKU -->
                 <td class="fw-bold text-primary">
                   {{ item.sku.product_code }}
                 </td>
 
-                <!-- Image -->
+                <!-- 3. Image -->
                 <td class="text-center">
                   {% if item.sku.image %}
-                  <img
-                    src="{{ item.sku.image.url }}"
-                    class="rounded"
-                    style="height: 35px; width: 35px; object-fit: cover"
-                  />
+                  <img src="{{ item.sku.image.url }}" class="rounded"
+                    style="height: 35px; width: 35px; object-fit: cover" />
                   {% else %}
                   <span class="text-muted small">-</span>
                   {% endif %}
                 </td>
 
-                <!-- Status -->
+                <!-- 4. Status -->
                 <td class="text-center">
                   {% if item.header.status == 'Pending' %}
-                  <span class="badge rounded-pill bg-warning text-dark"
-                    >รอส่ง</span
-                  >
+                  <span class="badge rounded-pill bg-warning text-dark">รอส่ง</span>
                   {% elif item.header.status == 'Complete' %}
                   <span class="badge rounded-pill bg-success">เรียบร้อย</span>
                   {% else %}
-                  <span class="badge rounded-pill bg-secondary"
-                    >{{ item.header.status }}</span
-                  >
+                  <span class="badge rounded-pill bg-secondary">{{ item.header.status }}</span>
                   {% endif %}
                 </td>
 
-                <!-- PO No -->
+                <!-- 5. PO No -->
                 <td>
-                  <a
-                    href="{% url 'po_detail' item.header.id %}"
-                    class="text-info text-decoration-none"
-                  >
+                  <a href="{% url 'po_detail' item.header.id %}" class="text-info text-decoration-none">
                     {{ item.header.po_number }}
                   </a>
                 </td>
 
-                <!-- Shipping Type -->
+                <!-- 6. Shipping Type -->
                 <td class="text-center">
                   {{ item.header.get_shipping_type_display|default:"-" }}
                 </td>
 
-                <!-- Dates -->
+                <!-- 7. Order Date -->
                 <td class="text-nowrap">
                   {{ item.header.order_date|date:"d/m/Y" }}
                 </td>
+
+                <!-- 8. Est Date -->
                 <td class="text-nowrap">
                   {{ item.header.estimated_date|date:"d/m/Y"|default:"-" }}
                 </td>
 
-                <!-- History Sub-rows -->
-                <td class="p-0">
-                  <!-- Received Date -->
-                  {% for r in item.receipts.all %}
-                  <div
-                    class="border-bottom px-2 py-1 small text-nowrap text-center"
-                  >
-                    {{ r.received_date|date:"d/m/Y" }}
-                  </div>
-                  {% empty %}
-                  <div class="px-2 py-1 text-center">-</div>
-                  {% endfor %}
-                </td>
-                <td class="p-0">
-                  <!-- Duration (Calculated from Receipt Date - Order Date) -->
-                  {% for r in item.receipts.all %}
-                  <div
-                    class="border-bottom px-2 py-1 small text-center text-muted"
-                  >
-                    {{ r.duration_from_order }} วัน
-                  </div>
-                  {% empty %}
-                  <div class="px-2 py-1 text-center">-</div>
-                  {% endfor %}
+                <!-- 9. Last Bill Date -->
+                <td class="text-nowrap text-center text-secondary">
+                  {% with last_receipt=item.receipts.last %}
+                  {% if last_receipt and last_receipt.batch %}
+                  {{ last_receipt.batch.bill_date|date:"d/m/Y"|default:"-" }}
+                  {% else %}
+                  -
+                  {% endif %}
+                  {% endwith %}
                 </td>
 
-                <!-- Received Qty Sub-rows -->
-                <td class="p-0">
-                  {% for r in item.receipts.all %}
-                  <div
-                    class="border-bottom px-2 py-1 small text-center fw-bold text-success"
-                  >
-                    {{ r.received_qty }}
-                  </div>
-                  {% empty %}
-                  <div class="px-2 py-1 text-center text-muted">0</div>
-                  {% endfor %}
+                <!-- 10. Last Received Date -->
+                <td class="text-nowrap text-center text-secondary">
+                  {% with last_receipt=item.receipts.last %}
+                  {% if last_receipt %}
+                  {{ last_receipt.received_date|date:"d/m/Y" }}
+                  {% else %}
+                  -
+                  {% endif %}
+                  {% endwith %}
                 </td>
 
-                <!-- Ordered -->
+                <!-- 11. Duration -->
+                <td class="text-center">
+                  {% with last_receipt=item.receipts.last %}
+                  {% if last_receipt %}
+                  <span class="text-muted small">{{ last_receipt.duration_from_order }} วัน</span>
+                  {% else %}
+                  -
+                  {% endif %}
+                  {% endwith %}
+                </td>
+
+                <!-- 12. Received Qty Status -->
+                <td
+                  class="text-center fw-bold {% if item.total_received_qty >= item.qty_ordered %}text-success{% else %}text-warning{% endif %}">
+                  {{ item.total_received_qty }} / {{ item.qty_ordered }}
+                </td>
+
+                <!-- 13. Ordered Qty -->
                 <td class="text-center fw-bold">{{ item.qty_ordered }}</td>
 
-                <!-- Financials -->
+                <!-- 14. Unit Cost THB -->
                 <td class="text-end text-primary fw-bold">
-                  {{ item.unit_cost_baht|floatformat:2|intcomma }}
+                  {{ item.unit_cost_thb|floatformat:2|intcomma }}
                 </td>
+
+                <!-- 15. Total Yuan -->
                 <td class="text-end">
                   {{ item.price_yuan|floatformat:2|intcomma }}
                 </td>
+
+                <!-- 16. Total Baht -->
                 <td class="text-end">
                   {{ item.price_baht|floatformat:2|intcomma }}
                 </td>
+
+                <!-- 17. Ex Rate -->
                 <td class="text-center">
                   {{ item.header.exchange_rate|floatformat:2 }}
                 </td>
 
-                <!-- Transport Cost -->
+                <!-- 18. Shipping Rate -->
                 <td class="text-center">
-                  {{ item.header.transportation_cost|floatformat:2|intcomma }}
+                  {{ item.header.shipping_rate_thb_cbm|floatformat:2 }}
                 </td>
 
-                <!-- Shipping Metrics -->
+                <!-- 19. Total CBM -->
                 <td class="text-end">
-                  {{ item.cbm|floatformat:4|default:"-" }}
+                  {{ item.total_received_cbm|floatformat:4|default:"-" }}
                 </td>
+
+                <!-- 20. Total Shipping Cost -->
                 <td class="text-end">
                   {{ item.total_shipping_cost|floatformat:2|intcomma }}
                 </td>
+
+                <!-- 21. Total Weight -->
                 <td class="text-end">
-                  {{ item.weight|floatformat:2|default:"-" }}
+                  {{ item.total_received_weight|floatformat:2|default:"-" }}
                 </td>
+
+                <!-- 22. Unit Price Yuan -->
                 <td class="text-end">
                   {{ item.unit_price_yuan|floatformat:2 }}
                 </td>
 
-                <!-- Platforms -->
+                <!-- 23. Ref Prices -->
                 <td class="text-end text-warning">
-                  {{ item.sku.shopee_price|floatformat:2|default:"0.00" }}
+                  {{ item.header.ref_price_shopee|floatformat:2|default:"-" }}
                 </td>
                 <td class="text-end text-primary">
-                  {{ item.sku.lazada_price|floatformat:2|default:"0.00" }}
+                  {{ item.header.ref_price_lazada|floatformat:2|default:"-" }}
                 </td>
                 <td class="text-end text-white fw-bold">
-                  {{ item.sku.tiktok_price|floatformat:2|default:"0.00" }}
+                  {{ item.header.ref_price_tiktok|floatformat:2|default:"-" }}
                 </td>
 
-                <!-- Note -->
+                <!-- 24. Note -->
                 <td>
-                  <small
-                    class="d-block text-truncate"
-                    style="max-width: 100px"
-                    title="{{ item.header.note }}"
-                  >
+                  <small class="d-block text-truncate" style="max-width: 100px" title="{{ item.header.note }}">
                     {{ item.header.note|default:"-" }}
                   </small>
                 </td>
 
-                <!-- New Column: Attachments -->
+                <!-- Extra: Attachments -->
                 <td class="text-center">
-                  {% with count=item.header.attachments.count %} 
-			{% if count > 0 %}
-                  <span class="badge bg-secondary text-white"
-                    >ไฟล์แนบจำนวน {{ count }}</span
-                  >
+                  {% with count=item.header.attachments.count %}
+                  {% if count > 0 %}
+                  <span class="badge bg-secondary text-white">ไฟล์ {{ count }}</span>
                   {% else %}
                   <span class="text-muted small">-</span>
-                  {% endif %} 
-		{% endwith %}
+                  {% endif %}
+                  {% endwith %}
                 </td>
 
-                <!-- New Column: Shop Link -->
+                <!-- Extra: Shop Link -->
                 <td class="text-center">
                   {% if item.header.link_shop %}
-                  <button
-                    class="btn btn-sm btn-outline-info border-0"
-                    onclick="showCopyModal('Link ร้านค้า', '{{ item.header.link_shop|escapejs }}')"
-                  >
-                    <i class="bi bi-shop"></i> Link
+                  <button class="btn btn-sm btn-outline-info border-0"
+                    onclick="showCopyModal('Link ดูสินค้า', '{{ item.header.link_shop|escapejs }}')">
+                    <i class="bi bi-shop"></i>
                   </button>
                   {% else %} - {% endif %}
                 </td>
 
-                <!-- New Column: WeChat / Contact -->
+                <!-- Extra: Contact -->
                 <td class="text-center">
                   {% if item.header.wechat_contact %}
-                  <button
-                    class="btn btn-sm btn-outline-success border-0"
-                    onclick="showCopyModal('WeChat / Contact', '{{ item.header.wechat_contact|escapejs }}')"
-                  >
-                    <i class="bi bi-chat-dots"></i> Contact
+                  <button class="btn btn-sm btn-outline-success border-0"
+                    onclick="showCopyModal('Contact', '{{ item.header.wechat_contact|escapejs }}')">
+                    <i class="bi bi-chat-dots"></i>
                   </button>
                   {% else %} - {% endif %}
                 </td>

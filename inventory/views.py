@@ -10,7 +10,7 @@ from django.views.decorators.http import require_POST
 from datetime import datetime, date, timedelta
 
 # Import Models and Utils
-from .models import MasterItem, Sale, POHeader, POItem, ReceivedPOItem, JSTStockSnapshot
+from .models import MasterItem, Sale, POHeader, POItem, ReceivedPOItem, JSTStockSnapshot, POReceiptBatch
 from utils.auth_utils import send_otp_email, create_token, generate_otp
 from utils.importers import ImportService
 from utils.stock_calculator import StockService
@@ -299,32 +299,62 @@ def po_detail_view(request, po_id):
                     po.shipping_type = request.POST.get('shipping_type')
                 
                 # Check presence before converting for numeric fields that might be disabled
+                # Check presence before converting for numeric fields that might be disabled
                 if 'exchange_rate' in request.POST:
-                    po.exchange_rate = float(request.POST.get('exchange_rate', 1.0) or 1.0)
+                    po.exchange_rate = Decimal(request.POST.get('exchange_rate', 1.0) or 1.0)
                 
                 if 'shipping_cost_baht' in request.POST:
-                    po.shipping_cost_baht = float(request.POST.get('shipping_cost_baht', 0) or 0)
+                    # Note: shipping_cost_baht might not be in model anymore based on previous checks, but if it is transient or deprecated model field:
+                    # Model has 'shipping_rate_thb_cbm'.
+                    # Let's check models.py line 67 in Step 651. It NO LONGER has shipping_cost_baht.
+                    # It has total_yuan, shipping_rate_thb_cbm.
+                    # I should probably remove this line or map it correctly if needed.
+                    # Assuming legacy field removal, I will comment it out or remove it to avoid AttributeError if field is gone.
+                    # Warning: The user code might still have it in models.py if I missed a migration or something.
+                    # But Step 651 showed models.py from line 29. shipping_cost_baht was NOT in lines 62-66.
+                    pass 
                 
+                # shipping_rate_kg -> removed from model in step 651 checklist.
                 if 'shipping_rate_kg' in request.POST:
-                    po.shipping_rate_kg = float(request.POST.get('shipping_rate_kg', 0) or 0)
+                     pass
                 
                 # Deprecated cbm rate
                 # po.shipping_rate_cbm = ...
                 
                 # New Fields
-                po.shipping_rate_yuan_per_cbm = float(request.POST.get('shipping_rate_yuan_per_cbm', 0) or 0)
+                po.total_yuan = Decimal(request.POST.get('total_yuan', 0) or 0)
+                po.shipping_rate_thb_cbm = Decimal(request.POST.get('shipping_rate_thb_cbm', 0) or 0)
                 
+                bill_date_str = request.POST.get('bill_date')
+                if bill_date_str:
+                    po.bill_date = datetime.strptime(bill_date_str, '%Y-%m-%d').date()
+                else:
+                    po.bill_date = None
+
                 # Prices
-                po.shopee_price = float(request.POST.get('shopee_price', 0) or 0) if request.POST.get('shopee_price') else None
-                po.lazada_price = float(request.POST.get('lazada_price', 0) or 0) if request.POST.get('lazada_price') else None
-                po.tiktok_price = float(request.POST.get('tiktok_price', 0) or 0) if request.POST.get('tiktok_price') else None
+                if request.POST.get('shopee_price'):
+                    po.ref_price_shopee = Decimal(request.POST.get('shopee_price', 0))
+                else:
+                    po.ref_price_shopee = None
+
+                if request.POST.get('lazada_price'):
+                    po.ref_price_lazada = Decimal(request.POST.get('lazada_price', 0))
+                else:
+                    po.ref_price_lazada = None
+
+                if request.POST.get('tiktok_price'):
+                    po.ref_price_tiktok = Decimal(request.POST.get('tiktok_price', 0))
+                else:
+                    po.ref_price_tiktok = None
 
                 po.note = request.POST.get('note', '')
                 po.link_shop = request.POST.get('link_shop', '')
                 po.wechat_contact = request.POST.get('wechat_contact', '')
-                po.tracking_no = request.POST.get('tracking_no', '')
+                # po.tracking_no = request.POST.get('tracking_no', '')
                 
                 po.save()
+                po.prorate_costs() # Recalculate costs if Total Yuan Changed
+                po.update_status()
                 
                 # Handle Files
                 files = request.FILES.getlist('attachments')
@@ -355,40 +385,104 @@ def po_detail_view(request, po_id):
                     try:
                         item_id = key.split('_')[2]
                         qty = int(value)
-                        cbm = Decimal(request.POST.get(f'cbm_{item_id}', 0) or 0)
-                        weight = Decimal(request.POST.get(f'weight_{item_id}', 0) or 0)
                         
                         item = POItem.objects.get(id=item_id, header=po)
                         item.qty_ordered = qty
-                        item.cbm = cbm
-                        item.weight = weight
                         item.save()
                         count_update += 1
                     except Exception as e:
                         print(f"Error updating item {key}: {e}")
 
-                # 2. Receive Logic
-                elif key.startswith('receive_qty_'):
+            # 2. Receive Logic (Static 5 Batches)
+            # Loop through Batch 1 to 5
+            saved_batches = []
+            
+            for i in range(1, 6):
+                # Check if this batch has data submitted
+                # We check key presence like 'batch_{i}_bill_date' or just try to process all
+                b_bill_date_str = request.POST.get(f'batch_{i}_bill_date')
+                b_recv_date_str = request.POST.get(f'batch_{i}_recv_date')
+                
+                # Proceed even if dates empty? Maybe logic depends on Qty inputs.
+                # Let's collect qtys first.
+                batch_qtys = {} # { item_id: qty }
+                total_qty_in_batch = 0
+                
+                for key, value in request.POST.items():
+                    # Expected key: receive_qty_{item_id}_{batch_no}
+                    if key.startswith('receive_qty_') and key.endswith(f'_{i}'):
+                        try:
+                            parts = key.split('_')
+                            # receive_qty_123_1 -> parts: ['receive', 'qty', '123', '1']
+                            item_id = parts[2]
+                            qty = int(value)
+                            if qty >= 0: # Allow 0 to update/clear
+                                batch_qtys[item_id] = qty
+                                total_qty_in_batch += qty
+                        except: pass
+                
+                # If we have any data (dates or qtys), we process this batch
+                if b_bill_date_str or b_recv_date_str or total_qty_in_batch > 0:
                     try:
-                        item_id_recv = key.split('_')[2]
-                        qty_recv = int(value) if value else 0
+                        # Get or Create Batch
+                        batch, created = POReceiptBatch.objects.get_or_create(
+                            header=po,
+                            batch_no=i,
+                            defaults={
+                                'bill_date': date.today(),
+                                'received_date': date.today()
+                            }
+                        )
                         
-                        if qty_recv > 0:
-                            item = POItem.objects.get(id=item_id_recv, header=po)
-                            cbm_recv = Decimal(request.POST.get(f'receive_cbm_{item_id_recv}', 0) or 0)
-                            weight_recv = Decimal(request.POST.get(f'receive_weight_{item_id_recv}', 0) or 0)
-                            
-                            ReceivedPOItem.objects.create(
-                                po_item=item,
-                                received_qty=qty_recv,
-                                received_cbm=cbm_recv,
-                                received_weight=weight_recv,
-                                received_date=receive_date
-                            )
-                            count_receive += 1
+                        # Update Batch Headers
+                        if b_bill_date_str:
+                            batch.bill_date = datetime.strptime(b_bill_date_str, '%Y-%m-%d').date()
+                        if b_recv_date_str:
+                             batch.received_date = datetime.strptime(b_recv_date_str, '%Y-%m-%d').date()
+                        
+                        try:
+                            batch.total_cbm = Decimal(request.POST.get(f'batch_{i}_total_cbm', 0) or 0)
+                            batch.total_weight = Decimal(request.POST.get(f'batch_{i}_total_kg', 0) or 0)
+                        except: pass
+                        
+                        batch.save()
+                        saved_batches.append(i)
+
+                        # Update Items
+                        for item_id, qty in batch_qtys.items():
+                            if not item_id: continue # specific fix for potentially empty IDs
+                            try:
+                                item_obj = POItem.objects.get(id=item_id, header=po)
+                                
+                                # Interpolate
+                                ratio = 0
+                                if total_qty_in_batch > 0:
+                                    ratio = Decimal(qty) / Decimal(total_qty_in_batch)
+                                
+                                i_cbm = batch.total_cbm * ratio
+                                i_kg = batch.total_weight * ratio
+                                
+                                # Update or Create Receipt
+                                ReceivedPOItem.objects.update_or_create(
+                                    po_item=item_obj,
+                                    batch=batch,
+                                    defaults={
+                                        'received_qty': qty,
+                                        'received_cbm': i_cbm,
+                                        'received_weight': i_kg,
+                                        'received_date': batch.received_date,
+                                        'bill_date': batch.bill_date
+                                    }
+                                )
+                            except Exception as e:
+                                print(f"Error processing item {item_id} batch {i}: {e}")
+
                     except Exception as e:
-                        print(f"Error receiving item {key}: {e}")
-            messages.success(request, f"✅ บันทึกข้อมูลสำเร็จ (แก้ไข: {count_update}, รับเข้า: {count_receive})")
+                        print(f"Error processing batch {i}: {e}")
+
+            if count_update > 0 or saved_batches:
+                messages.success(request, f"✅ Updated Info & Batches: {saved_batches}")
+            
             return redirect('po_detail', po_id=po.id)
 
         elif action == 'add_item':
@@ -401,11 +495,9 @@ def po_detail_view(request, po_id):
                     POItem.objects.create(
                         header=po,
                         sku=sku,
-                        qty_ordered=int(request.POST.get('new_qty', 1)),
-                        cbm=Decimal(request.POST.get('new_cbm', 0) or 0),
-                        weight=Decimal(request.POST.get('new_weight', 0) or 0),
-                        price_yuan=Decimal(request.POST.get('new_price_yuan', 0) or 0)
+                        qty_ordered=int(request.POST.get('new_qty', 1))
                     )
+                    po.prorate_costs() # Trigger Proration
                     messages.success(request, f"✅ เพิ่มสินค้า {sku_code} เรียบร้อย")
                     return redirect('po_detail', po_id=po.id)
                 except MasterItem.DoesNotExist:
@@ -421,9 +513,60 @@ def po_detail_view(request, po_id):
                  return redirect('po_detail', po_id=po.id)
              except Exception as e:
                  messages.error(request, f"Cannot delete item: {e}")
+
+    # --- GET LOGIC ---
+    # Prepare 5 Static Batches
+    batch_range = range(1, 6)
+    
+    # 1. Fetch existing batches maps
+    # map: batch_no -> POReceiptBatch
+    batch_map = { b.batch_no: b for b in po.receipt_batches.all() }
+    
+    # 2. Build Columns Context
+    batch_columns = []
+    for i in batch_range:
+        existing = batch_map.get(i)
+        batch_columns.append({
+            'no': i,
+            'obj': existing, # Can be None
+        })
+
+    # 3. Attach row values to items
+    # item.batch_qtys = { 1: 10, 2: 0, ... }
+    # item.summary = { total_qty, total_cbm, total_kg }
+    
+    items = po.items.all()
+    for item in items:
+        # Fetch receipts
+        receipts = item.receipts.all()
+        r_map = { r.batch.batch_no: r for r in receipts if r.batch }
+        
+        batch_values = [] # List of objects or dicts? simpler: list of qtys
+        
+        for i in batch_range:
+            r = r_map.get(i)
+            batch_values.append({
+                'qty': r.received_qty if r else 0,
+                'cbm': r.received_cbm if r else 0,
+                'weight': r.received_weight if r else 0
+            })
+        
+        item.batch_values = batch_values
+        
+        # Recalculate Summary (just to be safe/fresh)
+        item.sum_qty = sum(r.received_qty for r in receipts)
+        item.sum_cbm = sum(r.received_cbm for r in receipts)
+        item.sum_weight = sum(r.received_weight for r in receipts)
                 
     master_items = MasterItem.objects.all().order_by('product_code')
-    return render(request, 'inventory/po_detail.html', {'po': po, 'master_items': master_items})
+    
+    context = {
+        'po': po,
+        'items': items,
+        'master_items': master_items,
+        'batch_columns': batch_columns,
+    }
+    return render(request, 'inventory/po_detail.html', context)
 
 @login_required
 def receive_po_item(request, po_item_id):
@@ -838,24 +981,30 @@ def po_create_view(request):
             else:
                 estimated_date = None
             
-            # Function helper for floats
-            def get_float(name, default=0):
+            # Function helper for Decimals
+            def get_decimal(name, default=0):
                 val = request.POST.get(name, '')
-                try: return float(val)
-                except: return default
+                try: 
+                    return Decimal(val)
+                except: 
+                    return Decimal(default)
 
-            exchange_rate = get_float('exchange_rate', 1.0)
-            shipping_cost_baht = get_float('shipping_cost_baht')
+            exchange_rate = get_decimal('exchange_rate', 1.0)
             
             link_shop = request.POST.get('link_shop')
             wechat = request.POST.get('wechat_contact')
-            shopee_price = get_float('shopee_price', None)
-            lazada_price = get_float('lazada_price', None)
-            tiktok_price = get_float('tiktok_price', None)
+            shopee_price = get_decimal('shopee_price', 0)
+            lazada_price = get_decimal('lazada_price', 0)
+            tiktok_price = get_decimal('tiktok_price', 0)
             note = request.POST.get('note')
+            
              # New Fields
-            shipping_rate_yuan = get_float('shipping_rate_yuan_per_cbm', 0)
-            shipping_rate_kg = get_float('shipping_rate_kg', 0)
+            total_yuan = get_decimal('total_yuan', 0)
+            shipping_rate_thb_cbm = get_decimal('shipping_rate_thb_cbm', 0)
+            bill_date_str = request.POST.get('bill_date')
+            bill_date = None
+            if bill_date_str:
+                bill_date = datetime.strptime(bill_date_str, '%Y-%m-%d').date()
 
             # Create PO Header
             po = POHeader.objects.create(
@@ -865,14 +1014,14 @@ def po_create_view(request):
                 shipping_type=shipping_type if order_type == 'IMPORTED' else None,
                 estimated_date=estimated_date, # Now a date object or None
                 exchange_rate=exchange_rate,
-                shipping_cost_baht=shipping_cost_baht,
-                shipping_rate_yuan_per_cbm=shipping_rate_yuan,
-                shipping_rate_kg=shipping_rate_kg,
+                total_yuan=total_yuan,
+                shipping_rate_thb_cbm=shipping_rate_thb_cbm,
+                bill_date=bill_date,
                 link_shop=link_shop,
                 wechat_contact=wechat,
-                shopee_price=shopee_price,
-                lazada_price=lazada_price,
-                tiktok_price=tiktok_price,
+                ref_price_shopee=shopee_price,
+                ref_price_lazada=lazada_price,
+                ref_price_tiktok=tiktok_price,
                 note=note,
                 status='Pending'
             )
@@ -884,6 +1033,7 @@ def po_create_view(request):
                     POAttachment.objects.create(header=po, file=f)
 
             # 2. Process Items (Dynamic Rows)
+            count_items = 0
             for key in request.POST:
                 if key.startswith('sku_'):
                     row_id = key.split('_')[1]
@@ -895,40 +1045,32 @@ def po_create_view(request):
                     try:
                         master_item = MasterItem.objects.get(product_code=sku_code)
                     except MasterItem.DoesNotExist:
-                        # If AJAX, we might want to return error or just skip?
-                        # Skipping with warning is arguably better for bulk entry.
-                        # messages.warning(request, f"Review: SKU {sku_code} not found, skipped.")
+                        messages.warning(request, f"⚠️ SKU not found: {sku_code} (Skipped)")
                         continue
                         
-                    qty = get_float(f'qty_{row_id}', 1)
-                    yuan = get_float(f'yuan_{row_id}', 0)
-                    baht = get_float(f'baht_{row_id}', 0)
-                    # Dimensions removed
+                    qty = int(get_decimal(f'qty_{row_id}', 1))
                     
-                    cbm_val = get_float(f'cbm_{row_id}', None) # User total line CBM? Or Unit?
-                    # In html logic we assumed total CBM for summary. 
-                    # But usually data is stored as per-unit specs OR total line specs?
-                    # Model has `cbm` field. Is it unit or total?
-                    # User prompt: "Direct CBM Input ... defaulting to 1.0".
-                    # Let's save what user input.
-                    
-                    weight_val = get_float(f'kg_{row_id}', None)
-                    
+                    # Create Item with Qty Only (Costs calc later)
                     POItem.objects.create(
                         header=po,
                         sku=master_item,
-                        qty_ordered=int(qty),
-                        price_yuan=yuan, 
-                        price_baht=baht,
-                        cbm=cbm_val,
-                        weight=weight_val
+                        qty_ordered=int(qty)
                     )
+                    count_items += 1
+            
+            # Trigger Proration
+            po.prorate_costs()
+            po.update_status()
             
             # Success
             if request.headers.get('x-requested-with') == 'XMLHttpRequest':
                 return JsonResponse({'status': 'success', 'redirect_url': '/po/'})
             
-            messages.success(request, f"✅ สร้างใบสั่งซื้อ {po_number} สำเร็จ!")
+            if count_items == 0:
+                messages.warning(request, f"⚠️ PO {po_number} created but NO items were added (Check SKUs).")
+            else:
+                messages.success(request, f"✅ สร้างใบสั่งซื้อ {po_number} สำเร็จ ({count_items} รายการ)!")
+            
             return redirect('po_list')
 
         except Exception as e:
@@ -1028,17 +1170,82 @@ def get_po_history(request, sku):
     # Fetch all receipts for this SKU
     receipts = ReceivedPOItem.objects.filter(po_item__sku__product_code=sku).select_related('po_item', 'po_item__header', 'po_item__sku').order_by('-received_date')
     
-    # Check if template expects 'rows' with 'duration' attribute pre-calculated or via property.
-    # Model property is 'duration_from_order'.
-    # Template uses 'row.duration'. 
-    # We can annotate or wrap.
-    # But simpler: assume template refers to model property if I rename it? 
-    # Or just passing object is fine if template updated.
+    # Pre-calculate fields matching template expectations
+    processed_receipts = []
+    for r in receipts:
+        # Template expects:
+        # row.cost_per_piece
+        # row.total_yuan
+        # row.item.header.shipping_cost_baht (handled by model property?)
+        
+        # Calculate Cost Per Piece (Baht)
+        # Unit Cost = (Price Baht + Shipping Cost for this item) / Qty Ordered
+        unit_cost = r.po_item.unit_cost_thb or 0
+        r.cost_per_piece = unit_cost
+        
+        # Total Yuan (Price Yuan * Qty Ordered)
+        # Note: Template uses 'total_yuan', assuming for the whole line item or just received? 
+        # Usually history shows the PO Item specs.
+        r.total_yuan = (r.po_item.price_yuan or 0) * (r.po_item.qty_ordered or 0)
+        
+        processed_receipts.append(r)
     
-    return render(request, 'inventory/partials/po_history_table.html', {'history_items': receipts})
+    return render(request, 'inventory/partials/po_history_table.html', {'history_items': processed_receipts})
 
 @login_required
 def get_sales_history(request, sku):
-    # Placeholder for sales history if needed, based on urls.py
-    # sales = Sale.objects.filter(sku__product_code=sku)...
-    return render(request, 'inventory/partials/sales_history_table.html', {'sales': []})
+    # Fetch sales for the given SKU
+    sales = Sale.objects.filter(sku__product_code=sku).order_by('-date')
+    
+    # Platform Colors
+    platform_colors = {
+        'Shopee': '#EE4D2D',
+        'Lazada': '#0f146d',
+        'TikTok': '#000000',
+    }
+    
+    # Status Colors (Bootstrap classes)
+    status_classes = {
+        'สำเร็จ': 'bg-success',
+        'Completed': 'bg-success',
+        'ยกเลิก': 'bg-danger',
+        'Cancelled': 'bg-danger',
+        'ที่ต้องจัดส่ง': 'bg-warning text-dark',
+        'To Ship': 'bg-warning text-dark',
+    }
+    
+    processed_sales = []
+    total_qty = 0
+    total_amount = Decimal(0)
+    total_net = Decimal(0)
+    
+    for s in sales:
+        # Calculate Total Fees (Sum of all fee fields)
+        fees = (s.payment_fee or 0) + (s.commission_fee or 0) + (s.service_fee or 0) + (s.shipping_fee or 0) + (s.voucher_amount or 0)
+        
+        # Determine Colors
+        status_cls = status_classes.get(s.status, 'bg-secondary')
+        plat_color = platform_colors.get(s.platform, None)
+        
+        # Attach attributes for template (Python object wrapper or dict)
+        # Since we are passing 'sales' to template which expects object attributes, 
+        # we can attach to the model instance directly for this request.
+        s.fees = fees
+        s.status_class = status_cls
+        s.platform_color = plat_color
+        
+        processed_sales.append(s)
+        
+        # Totals
+        total_qty += s.qty
+        total_amount += s.total_price
+        total_net += s.net_price
+
+    context = {
+        'sales': processed_sales,
+        'total_qty': total_qty,
+        'total_amount': total_amount,
+        'total_net': total_net,
+    }
+    
+    return render(request, 'inventory/partials/sales_history_table.html', context)

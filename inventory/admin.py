@@ -11,8 +11,8 @@ class MasterItemAdmin(admin.ModelAdmin):
 class POItemInline(admin.TabularInline):
     model = POItem
     extra = 0
-    fields = ('sku', 'qty_ordered', 'total_received_qty', 'price_yuan', 'price_baht', 'cbm')
-    readonly_fields = ('cbm', 'price_baht', 'total_received_qty')
+    fields = ('sku', 'qty_ordered', 'total_received_qty', 'price_yuan', 'price_baht')
+    readonly_fields = ('price_baht', 'total_received_qty')
 
 @admin.register(POHeader)
 class POHeaderAdmin(admin.ModelAdmin):
