@@ -106,12 +106,13 @@ JST System{% endblock %} {% block content %}
                 <!-- Dates - Purple -->
                 <th style="background-color: #6f42c1">วันที่สั่งซื้อ</th>
                 <th style="background-color: #6f42c1">วันคาดการณ์</th>
-                <th style="background-color: #6f42c1">วันที่บิล (ล่าสุด)</th>
-                <th style="background-color: #6f42c1">วันที่รับ (ล่าสุด)</th>
+                <th style="background-color: #6f42c1">วันที่บิลเรียกเก็บ</th>
+                <th style="background-color: #6f42c1">วันที่ได้รับสินค้า</th>
                 <th style="background-color: #6f42c1">ระยะเวลา</th>
 
                 <!-- Received - Purple/Dark -->
-                <th style="background-color: #6f42c1">รับแล้ว (ชิ้น)</th>
+                <th style="background-color: #6f42c1">จำนวนรับ</th>
+                <th style="background-color: #6f42c1">รับแล้ว</th>
 
                 <!-- Ordered/Cost - Green -->
                 <th style="background-color: #198754">สั่งซื้อ</th>
@@ -199,42 +200,56 @@ JST System{% endblock %} {% block content %}
                 </td>
 
                 <!-- 9. Last Bill Date -->
-                <td class="text-nowrap text-center text-secondary">
-                  {% with last_receipt=item.receipts.last %}
-                  {% if last_receipt and last_receipt.batch %}
-                  {{ last_receipt.batch.bill_date|date:"d/m/Y"|default:"-" }}
-                  {% else %}
-                  -
-                  {% endif %}
-                  {% endwith %}
+                <td class="text-nowrap text-center text-secondary p-0 align-top">
+                  {% for r in item.receipts.all %}
+                  <div class="border-bottom border-start border-end py-1 d-flex align-items-center justify-content-center"
+                    style="height: 30px;">
+                    {{ r.batch.bill_date|date:"d/m/Y"|default:"-" }}
+                  </div>
+                  {% empty %}
+                  <div class="py-1 d-flex align-items-center justify-content-center" style="height: 30px;">-</div>
+                  {% endfor %}
                 </td>
 
                 <!-- 10. Last Received Date -->
-                <td class="text-nowrap text-center text-secondary">
-                  {% with last_receipt=item.receipts.last %}
-                  {% if last_receipt %}
-                  {{ last_receipt.received_date|date:"d/m/Y" }}
-                  {% else %}
-                  -
-                  {% endif %}
-                  {% endwith %}
+                <td class="text-nowrap text-center text-secondary p-0 align-top">
+                  {% for r in item.receipts.all %}
+                  <div class="border-bottom  border-end py-1 d-flex align-items-center justify-content-center"
+                    style="height: 30px;">
+                    {{ r.received_date|date:"d/m/Y" }}
+                  </div>
+                  {% empty %}
+                  <div class="py-1 d-flex align-items-center justify-content-center" style="height: 30px;">-</div>
+                  {% endfor %}
                 </td>
 
                 <!-- 11. Duration -->
-                <td class="text-center">
-                  {% with last_receipt=item.receipts.last %}
-                  {% if last_receipt %}
-                  <span class="text-muted small">{{ last_receipt.duration_from_order }} วัน</span>
-                  {% else %}
-                  -
-                  {% endif %}
-                  {% endwith %}
+                <td class="text-center p-0 align-top">
+                  {% for r in item.receipts.all %}
+                  <div class="border-bottom  border-end py-1 d-flex align-items-center justify-content-center"
+                    style="height: 30px;">
+                    <span class="text-muted">{{ r.duration_from_order }} วัน</span>
+                  </div>
+                  {% empty %}
+                  <div class="py-1 d-flex align-items-center justify-content-center" style="height: 30px;">-</div>
+                  {% endfor %}
                 </td>
 
                 <!-- 12. Received Qty Status -->
-                <td
-                  class="text-center fw-bold {% if item.total_received_qty >= item.qty_ordered %}text-success{% else %}text-warning{% endif %}">
-                  {{ item.total_received_qty }} / {{ item.qty_ordered }}
+                <td class="text-center p-0 align-top">
+                  {% for r in item.receipts.all %}
+                  <div class="border-bottom border-end py-1 d-flex align-items-center justify-content-center"
+                    style="height: 30px;">
+                    <span class="text-muted">{{ r.received_qty }}</span>
+                    
+                  </div>
+                  {% empty %}
+                  <div class="py-1 d-flex align-items-center justify-content-center" style="height: 30px;">0</div>
+                  {% endfor %}
+                </td>
+
+                <td class="text-center {% if item.total_received_qty >= item.qty_ordered %}text-success{% else %}text-warning{% endif %}" >
+                  {{ item.total_received_qty }}
                 </td>
 
                 <!-- 13. Ordered Qty -->

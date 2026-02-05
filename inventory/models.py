@@ -254,6 +254,9 @@ class ReceivedPOItem(models.Model):
     received_weight = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="น้ำหนักที่รับ")
     received_date = models.DateField(default=date.today, verbose_name="วันที่รับ")
 
+    class Meta:
+        ordering = ['received_date', 'id']
+
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
         self.update_po_item_received()
@@ -280,6 +283,12 @@ class ReceivedPOItem(models.Model):
         item.save()
         # Trigger header status update
         item.header.update_status()
+
+    @property
+    def duration_from_order(self):
+        if self.received_date and self.po_item.header.order_date:
+            return (self.received_date - self.po_item.header.order_date).days
+        return 0
 
 class POAttachment(models.Model):
     header = models.ForeignKey(POHeader, on_delete=models.CASCADE, related_name='attachments')
