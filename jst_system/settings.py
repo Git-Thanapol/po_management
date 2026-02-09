@@ -190,5 +190,10 @@ LOGGING = {
             'level': 'ERROR',
             'propagate': True,
         },
+        'utils': {
+            'handlers': ['file', 'console'],
+            'level': 'INFO', # Capture our image import logs
+            'propagate': True,
+        },
     },
 }
