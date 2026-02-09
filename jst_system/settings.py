@@ -25,13 +25,16 @@ SECRET_KEY = 'django-insecure-t^%1jf(b!4+3)c!!y*vqj*81g1eu#yryb&4f9hew+e(tl219l1
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['*'] # In production, set this to your domain or IP
+ALLOWED_HOSTS = ['*'] # We can leave * or be specific: ['103.114.201.9', '.nip.io']
 
 # CSRF Settings for Production
 CSRF_TRUSTED_ORIGINS = [
     'http://103.114.201.9:8001',
     'http://103.114.201.9',
-    'https://103.114.201.9', # Added for HTTPS
+    'https://103.114.201.9',
+    'http://103.114.201.9.nip.io',
+    'https://103.114.201.9.nip.io',
+    'http://103.114.201.9.nip.io:8001',
 ]
 
 # Static files (CSS, JavaScript, Images)
