@@ -58,13 +58,22 @@ class ImportService:
                 # Image Handling (Only if URL provided and different?)
                 # Logic: If 'รูปภาพ' is a URL, download it.
                 image_url = row.get('รูปภาพ')
-                if image_url and str(image_url).startswith('http'):
-                    # Save logic (maybe check if already has image?)
-                    # For now, simplistic: download if provided
-                    file_name = f"{code}.jpg" # or derive extension
-                    content = ImportService.download_image(image_url, file_name)
-                    if content:
-                        item.image.save(file_name, content, save=False)
+                if image_url:
+                    logger.info(f"Row {index} [{code}]: Found 'รูปภาพ': {image_url}")
+                    if str(image_url).startswith('http'):
+                        # Save logic (maybe check if already has image?)
+                        # For now, simplistic: download if provided
+                        file_name = f"{code}.jpg" # or derive extension
+                        logger.info(f"Attempting download for {code} from {image_url}")
+                        
+                        content = ImportService.download_image(image_url, file_name)
+                        if content:
+                            logger.info(f"Download success. Saving to {file_name}")
+                            item.image.save(file_name, content, save=False)
+                        else:
+                            logger.error(f"Download failed for {code}")
+                    else:
+                         logger.warning(f"Row {index} [{code}]: Image value is not a generic URL: {image_url}")
                 
                 item.save()
                 results["success"] += 1
