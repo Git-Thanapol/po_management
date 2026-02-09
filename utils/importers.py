@@ -32,6 +32,7 @@ class ImportService:
     def import_master_items(file):
         df = pd.read_excel(file)
         df = ImportService.clean_header(df)
+        logger.info(f"Starting import_master_items. Rows found: {len(df)}")
         
         # Mapping: 'รหัสสินค้า': product_code, 'ชื่อสินค้า': name, 'รูปภาพ': image
         # 'รูปแบบสินค้า': product_format, 'Type': category, 'สินค้าคงเหลือ': current_stock
@@ -47,6 +48,9 @@ class ImportService:
                 
                 # Check if exists to update or create
                 item, created = MasterItem.objects.get_or_create(product_code=code)
+                
+                action = "Created" if created else "Updated"
+                logger.info(f"Processing {code}: {action}")
                 
                 item.name = row.get('ชื่อสินค้า', item.name)
                 item.product_format = row.get('รูปแบบสินค้า', item.product_format)
@@ -76,8 +80,10 @@ class ImportService:
                 results["success"] += 1
             except Exception as e:
                 results["failed"] += 1
+                logger.error(f"Error processing row {index}: {e}", exc_info=True)
                 results["errors"].append(f"Row {index}: {e}")
         
+        logger.info(f"Import finished. Results: {results}")
         return results
 
     @staticmethod
