@@ -18,6 +18,11 @@ class MasterItem(models.Model):
     
     note = models.TextField(blank=True, null=True, verbose_name="Note")
     
+    # New Fields for Stock Report Enhancements
+    is_favourite = models.BooleanField(default=False, verbose_name="รายการโปรด")
+    note1 = models.TextField(blank=True, null=True, verbose_name="หมายเหตุ 1")
+    note2 = models.TextField(blank=True, null=True, verbose_name="หมายเหตุ 2")
+    
     # Selling Price Benchmarks
     shopee_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="ราคาขาย Shopee")
     lazada_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="ราคาขาย Lazada")
@@ -63,6 +68,7 @@ class POHeader(models.Model):
     total_yuan = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="ยอดหยวนรวม (Input)")
     shipping_rate_thb_cbm = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="เรทค่าขนส่ง THB/คิว")
     bill_date = models.DateField(blank=True, null=True, verbose_name="วันที่บิลเรียกเก็บ") # New field requested
+    vat_rate = models.DecimalField(max_digits=5, decimal_places=2, default=7.00, verbose_name="VAT %")
 
     # Extra fields
     link_shop = models.CharField(max_length=255, blank=True, null=True, verbose_name="ลิงค์ร้านค้า")
@@ -177,6 +183,7 @@ class POItem(models.Model):
     header = models.ForeignKey(POHeader, on_delete=models.CASCADE, related_name='items')
     sku = models.ForeignKey(MasterItem, on_delete=models.CASCADE, verbose_name="รหัสสินค้า")
     qty_ordered = models.IntegerField(verbose_name="สั่งซื้อ")
+    unit_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="ราคาต่อหน่วย")
     
     # Prorated Costs (Calculated)
     price_yuan = models.DecimalField(max_digits=12, decimal_places=4, default=0, verbose_name="Total Yuan (Prorated)")

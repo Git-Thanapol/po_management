@@ -4,7 +4,7 @@ from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db.models import Sum, F, Q, DecimalField
+from django.db.models import Sum, F, Q, DecimalField, Count, ExpressionWrapper
 from django.db.models.functions import Coalesce
 from django.views.decorators.http import require_POST
 from datetime import datetime, date, timedelta
@@ -209,9 +209,34 @@ def po_list_view(request):
     search_query = request.GET.get('search', '').strip()
     status_filter = request.GET.get('status', '')
     
-    # Revert to showing Items as per user requirement
-    items = POItem.objects.all().select_related('header', 'sku').prefetch_related('receipts', 'header__attachments').order_by('-header__order_date')
+    # Date Filters
+    start_date_str = request.GET.get('start_date', '')
+    end_date_str = request.GET.get('end_date', '')
+    bill_start_date_str = request.GET.get('bill_start_date', '')
+    bill_end_date_str = request.GET.get('bill_end_date', '')
     
+    # Base Query
+    items = POItem.objects.all().select_related('header', 'sku').prefetch_related('receipts', 'header__attachments', 'receipts__batch').order_by('-header__order_date')
+    
+    # 1. Date Range Filter (Created Date)
+    if start_date_str and end_date_str:
+        try:
+            s_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            e_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            items = items.filter(header__order_date__range=[s_date, e_date])
+        except ValueError:
+            pass
+            
+    # 2. Bill Date Filter (Received History)
+    if bill_start_date_str and bill_end_date_str:
+        try:
+            bs_date = datetime.strptime(bill_start_date_str, '%Y-%m-%d').date()
+            be_date = datetime.strptime(bill_end_date_str, '%Y-%m-%d').date()
+            # Filter items that have receipts in this bill date range
+            items = items.filter(receipts__batch__bill_date__range=[bs_date, be_date]).distinct()
+        except ValueError:
+            pass
+
     if po_number_query:
         items = items.filter(header__po_number__icontains=po_number_query)
         
@@ -222,22 +247,13 @@ def po_list_view(request):
         if status_filter == 'arriving_soon':
             # Next 7 days
             next_week = date.today() + timedelta(days=7)
-            items = items.filter(header__status__in=['Pending'], header__estimated_date__range=[date.today(), next_week])
+            items = items.filter(header__status='Pending', header__estimated_date__range=[date.today(), next_week])
         elif status_filter == 'incomplete':
-            # Pending but has received some? Or just Pending?
-            # "สินค้าไม่ครบ" usually means Received Partial.
-            # We need to filter items that have receipts but not complete.
-            # Filtering on property or aggregate is hard without annotation.
-            # Let's assume for now it means "Pending" but we want to differentiate from "Waiting Shipment".
-            # Actually, "Waiting Shipment" (รอจัดส่ง) -> Qty Received = 0
-            # "Incomplete" (สินค้าไม่ครบ) -> Qty Received > 0 but not Complete
-            # Annotating received qty first:
-            from django.db.models import Sum
+            # Pending but has received some
             items = items.annotate(received_sum=Sum('receipts__received_qty'))
             items = items.filter(header__status='Pending', received_sum__gt=0)
         elif status_filter == 'waiting_shipment':
             # Pending and No Receipts
-            from django.db.models import Sum
             items = items.annotate(received_sum=Sum('receipts__received_qty'))
             items = items.filter(header__status='Pending', received_sum__isnull=True) # or 0
         elif status_filter == 'overdue':
@@ -252,14 +268,123 @@ def po_list_view(request):
     if selected_category:
         items = items.filter(sku__category=selected_category)
         
+    # --- Summary Metrics (On Filtered Data) ---
+    summary = {
+        'total_items': items.count(),
+        'waiting': 0,
+        'arriving': 0,
+        'incomplete': 0,
+        'overdue': 0,
+        'complete': 0,
+        'shipping_cost': 0,
+    }
+    
+    # For Status Counts, we need to apply logic.
+    # Since we can't easily do conditional Count on computed logic in DB for everything without complex annotations,
+    # and "items" is already filtered by status_filter (if present), the Summary might look weird if we only show 1 status card when filtered.
+    # BUT typically dashboards show "Current View Summary". So if I filter "Pending", "Complete" card should be 0.
+    
+    # 1. Total Shipping (Imported Only)
+    # Filter imported items from CURRENT queryset
+    imported_items = items.filter(header__order_type='IMPORTED')
+    shipping_agg = imported_items.annotate(
+        cost=ExpressionWrapper(
+            F('total_received_cbm') * F('header__shipping_rate_thb_cbm'),
+            output_field=DecimalField()
+        )
+    ).aggregate(total=Sum('cost'))
+    summary['shipping_cost'] = shipping_agg['total'] or 0
+
+    # 2. Status Counts
+    # We can iterate or run separate count queries. Accessing .count() on filtered querysets is generally fast.
+    # Note: If 'status_filter' is applied, 'items' is already narrowed. 
+    # If user wants "Global Stats" regardless of filter, we should use a fresh queryset.
+    # User Request: "รายการทั้งหมด นับจำนวนแถวในฟิลเตอร์นี้" (Total items in THIS filter).
+    # So implies other cards should also respect the filter?
+    # "รอจัดส่ง นับจำนวนสถานะ", "สินค้าใกล้ถึง นับจำนวนสถานะ"...
+    # Usually summary cards break down the current subset.
+    
+    # However, filtering by "Pending" makes "Complete" count 0. This is standard behavior.
+    # Let's verify status Logic on the current 'items' queryset.
+    
+    # Using aggregations/annotations to count in one go if possible, but logic is complex (dates, sums).
+    # Separate queries are clearer for maintenance.
+    
+    # Waiting Shipment: Pending & No Receipt
+    summary['waiting'] = items.annotate(rcv=Sum('receipts__received_qty')).filter(header__status='Pending', rcv__isnull=True).count()
+    
+    # Arriving Soon: Pending & Date range
+    next_week = date.today() + timedelta(days=7)
+    summary['arriving'] = items.filter(
+        header__status='Pending', 
+        header__estimated_date__range=[date.today(), next_week]
+    ).count()
+    
+    # Incomplete: Pending & Received > 0
+    summary['incomplete'] = items.annotate(rcv=Sum('receipts__received_qty')).filter(header__status='Pending', rcv__gt=0).count()
+    
+    # Overdue
+    summary['overdue'] = items.exclude(header__status='Complete').filter(header__estimated_date__lt=date.today()).count()
+    
+    # Complete
+    summary['complete'] = items.filter(header__status='Complete').count()
+
+    # --- Footer/Table Totals (All Filtered Items) ---
+    # We need: Ordered Qty, Received Qty, Price Yuan, Price Baht, CBM, Weight, Shipping Cost
+    # Note: Shipping Cost logic = CBM * Header Rate (for imported). 
+    # For Domestic, if rate is 0, it's 0.
+    
+    footer_aggs = items.annotate(
+        shipping_cost=ExpressionWrapper(
+            F('total_received_cbm') * Coalesce(F('header__shipping_rate_thb_cbm'), Decimal(0)),
+            output_field=DecimalField()
+        )
+    ).aggregate(
+        total_ordered=Sum('qty_ordered'),
+        total_received=Sum('total_received_qty'),
+        total_yuan=Sum('price_yuan'),
+        total_baht=Sum('price_baht'),
+        total_cbm=Sum('total_received_cbm'),
+        total_weight=Sum('total_received_weight'),
+        total_shipping=Sum('shipping_cost')
+    )
+    
+    # Calculate Average Price/Piece
+    # Rule: (Total Baht + Total Shipping) / Total Ordered Qty
+    t_baht = footer_aggs['total_baht'] or Decimal(0)
+    t_ship = footer_aggs['total_shipping'] or Decimal(0)
+    t_qty = footer_aggs['total_ordered'] or 0
+    
+    avg_price = 0
+    if t_qty > 0:
+        avg_price = (t_baht + t_ship) / Decimal(t_qty)
+        
+    footer_summary = {
+        'total_ordered': t_qty,
+        'total_received': footer_aggs['total_received'] or 0,
+        'total_yuan': footer_aggs['total_yuan'] or 0,
+        'total_baht': t_baht,
+        'total_cbm': footer_aggs['total_cbm'] or 0,
+        'total_weight': footer_aggs['total_weight'] or 0,
+        'total_shipping': t_ship,
+        'avg_price': avg_price
+    }
+
     context = {
         'po_items': items,
         'po_number_query': po_number_query,
         'search_query': search_query,
-        'search_query': search_query,
         'status_filter': status_filter,
         'categories': categories,
         'selected_category': selected_category,
+        
+        # New Context
+        'start_date': start_date_str,
+        'end_date': end_date_str,
+        'bill_start_date': bill_start_date_str,
+        'bill_end_date': bill_end_date_str,
+        'summary': summary,
+        'footer_summary': footer_summary,
     }
     return render(request, 'inventory/po_list.html', context)
 
@@ -777,64 +902,129 @@ def daily_sales_view(request):
 
 @login_required
 def stock_report_view(request):
+    # Handle AJAX Update
+    if request.method == 'POST' and request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        action = request.POST.get('action')
+        if action == 'update_field':
+            sku = request.POST.get('sku')
+            field = request.POST.get('field')
+            value = request.POST.get('value')
+            
+            try:
+                item = MasterItem.objects.get(product_code=sku)
+                if field == 'is_favourite':
+                    item.is_favourite = (value == 'true')
+                elif field == 'note1':
+                    item.note1 = value
+                elif field == 'note2':
+                    item.note2 = value
+                elif field == 'min_limit':
+                    item.min_limit = int(value) if value else 0
+                item.save()
+                return JsonResponse({'success': True})
+            except MasterItem.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'Item not found'})
+            except Exception as e:
+                return JsonResponse({'success': False, 'error': str(e)})
+
+    # Filters
     search_query = request.GET.get('search', '').strip()
     status_filter = request.GET.get('status', '')
+    selected_category = request.GET.get('category', '')
+    show_fav = request.GET.get('fav') == 'true'
     
-    # optimize: prefetch logic needed for StockService? 
-    # StockService fetches JSTStockSnapshot and aggregations.
-    # To avoid N+1, ideally we fetch all snapshots and aggregations in bulk.
-    # But for simplicity/time, we iterate. 800 items might take 1-2s. Acceptable for prototype V1.
-    
+    # Base Query
     items_qs = MasterItem.objects.all().order_by('product_code')
+    
     if search_query:
         items_qs = items_qs.filter(Q(product_code__icontains=search_query) | Q(name__icontains=search_query))
         
-    # Category Filter
-    categories = MasterItem.objects.values_list('category', flat=True).distinct().order_by('category')
-    selected_category = request.GET.get('category', '')
     if selected_category:
         items_qs = items_qs.filter(category=selected_category)
         
-    stock_data = []
+    if show_fav:
+        items_qs = items_qs.filter(is_favourite=True)
+
+    # Categories for filter
+    categories = MasterItem.objects.values_list('category', flat=True).distinct().order_by('category')
+    
+    # Annotate with Pending PO Data (Waiting/Arriving)
+    today = date.today()
+    next_week = today + timedelta(days=7)
+    
+    # We need to map SKU -> { qty_pending, qty_arriving }
+    # Let's do this efficiently.
+    # Group by SKU, filter PO Status=Pending
+    
+    pending_items = POItem.objects.filter(header__status='Pending').values('sku').annotate(
+        total_pending=Sum('qty_ordered')
+    )
+    pending_map = {p['sku']: p['total_pending'] for p in pending_items}
+    
+    # Arriving Logic: Pending AND Estimated Date <= next 7 days
+    arriving_items = POItem.objects.filter(
+        header__status='Pending',
+        header__estimated_date__range=[today, next_week]
+    ).values('sku').annotate(
+        total_arriving=Sum('qty_ordered')
+    )
+    arriving_map = {p['sku']: p['total_arriving'] for p in arriving_items}
+
+    # "Stock Alert" logic based on existing code style (iterating)
+    filtered_data = []
     
     for item in items_qs:
-        # Calculate Stock
-        calc = StockService.calculate_stock(item.product_code)
+        # Calculate Stock (Using Model Logic or Service if exists)
+        # Using item.current_stock directly for now as per model definition
+        current_stock = item.current_stock
         
-        # Build display object
-        obj = {
+        # Pending/Arriving from Maps
+        qty_pending = pending_map.get(item.product_code, 0)
+        # qty_arriving is subset of pending? Or separate? 
+        # Usually user just wants to know "Incoming".
+        # Let's use total_pending as "Incoming".
+        
+        # Status Logic
+        status_code = 'normal'
+        if current_stock <= 0:
+            status_code = 'out_of_stock' # Sold Out / Red
+        elif current_stock <= item.min_limit:
+            status_code = 'low_stock' # Low / Orange
+        
+        # Filter Logic
+        # Mapping UI status to internal code
+        # UI: "ok" (Normal), "low" (Low), "empty" (Sold Out)
+        
+        if status_filter == 'empty' and status_code != 'out_of_stock': continue
+        if status_filter == 'low' and status_code != 'low_stock': continue
+        if status_filter == 'ok' and status_code != 'normal': continue
+        
+        # Alert Diff
+        alert_diff = 0
+        if current_stock < item.min_limit:
+            alert_diff = item.min_limit - current_stock
+            
+        filtered_data.append({
             'sku': item.product_code,
             'name': item.name,
             'image_url': item.image.url if item.image else None,
-            'qty': calc['qty'],
-            'status': calc['status'],
-            'source': calc['source'],
+            'current_stock': current_stock,
+            'status_code': status_code,
+            'qty_pending': qty_pending,
             'min_limit': item.min_limit,
-            'min_limit': item.min_limit,
-            'note': item.note,
-            'total_sales': Sale.objects.filter(sku=item).aggregate(total=Sum('qty'))['total'] or 0,
-            'total_received': ReceivedPOItem.objects.filter(po_item__sku=item).aggregate(total=Sum('received_qty'))['total'] or 0,
-        }
-        
-        # Apply Status Filter in Python
-        include = True
-        if status_filter == 'empty':
-            if "หมด" not in obj['status']: include = False
-        elif status_filter == 'low':
-            if "ใกล้" not in obj['status']: include = False
-        elif status_filter == 'ok':
-            if "มี" not in obj['status']: include = False
-            
-        if include:
-            stock_data.append(obj)
-            
+            'alert_diff': alert_diff,
+            'is_favourite': item.is_favourite,
+            'note1': item.note1,
+            'note2': item.note2,
+        })
+
     context = {
-        'stock_items': stock_data,
-        'stock_items': stock_data,
+        'stock_items': filtered_data,
         'search_query': search_query,
         'selected_status': status_filter,
         'categories': categories,
         'selected_category': selected_category,
+        'show_fav': show_fav,
     }
     return render(request, 'inventory/stock_report.html', context)
 
@@ -998,9 +1188,13 @@ def po_create_view(request):
             tiktok_price = get_decimal('tiktok_price', 0)
             note = request.POST.get('note')
             
-             # New Fields
+            # New Fields
             total_yuan = get_decimal('total_yuan', 0)
             shipping_rate_thb_cbm = get_decimal('shipping_rate_thb_cbm', 0)
+            
+            # VAT Rate
+            vat_rate = get_decimal('vat_rate', 7.0)
+
             bill_date_str = request.POST.get('bill_date')
             bill_date = None
             if bill_date_str:
@@ -1017,6 +1211,7 @@ def po_create_view(request):
                 total_yuan=total_yuan,
                 shipping_rate_thb_cbm=shipping_rate_thb_cbm,
                 bill_date=bill_date,
+                vat_rate=vat_rate,
                 link_shop=link_shop,
                 wechat_contact=wechat,
                 ref_price_shopee=shopee_price,
@@ -1049,17 +1244,45 @@ def po_create_view(request):
                         continue
                         
                     qty = int(get_decimal(f'qty_{row_id}', 1))
+                    unit_price = get_decimal(f'unit_price_{row_id}', 0)
                     
-                    # Create Item with Qty Only (Costs calc later)
+                    # Create Item with Qty Only (Costs calc later or now for Domestic)
                     POItem.objects.create(
                         header=po,
                         sku=master_item,
-                        qty_ordered=int(qty)
+                        qty_ordered=int(qty),
+                        unit_price=unit_price if order_type == 'DOMESTIC' else None
                     )
                     count_items += 1
             
-            # Trigger Proration
-            po.prorate_costs()
+            # Trigger Proration (Only for Imported or mixed logic if needed)
+            if order_type == 'IMPORTED':
+                po.prorate_costs()
+            else:
+                 # Domestic: Calculate costs from unit price
+                 # We can use prorate_costs if modified, or do it here manually for safety initially, 
+                 # BUT prorate_costs is called on save/signals too. 
+                 # We updated models to check `order_type` inside `prorate_costs`? No, we didn't touch methods yet. 
+                 # Let's rely on standard save for now, but domestic items have unit_price. 
+                 # We should probably calculate total_baht for item based on unit_price * qty.
+                 for item in po.items.all():
+                     if item.unit_price:
+                         item.price_baht = item.unit_price * item.qty_ordered
+                         # VAT logic? Model doesn't have vat field on item, usually calculated on fly or stored in price_baht (inc/excl). 
+                         # User requirement: "Total item amount (Subtotal + VAT)".
+                         # `price_baht` usually stores the Total Cost in THB.
+                         # Should we store Inclusive or Exclusive? 
+                         # Let's store Exclusive in `price_baht` or Inclusive? 
+                         # Existing `price_baht` for Import is "Total Baht" (prorated from Total Yuan * Exch).
+                         # For Domestic, let's say `price_baht` = Subtotal + VAT (Grand Total for line).
+                         # Or just Subtotal?
+                         # If we want consistent "Cost", it should probably be Grand Total.
+                         # Let's calculate:
+                         subtotal = item.unit_price * item.qty_ordered
+                         vat_amount = subtotal * (po.vat_rate / 100)
+                         item.price_baht = subtotal + vat_amount
+                         item.save()
+
             po.update_status()
             
             # Success

@@ -58,114 +58,132 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
             </option>
           </select>
         </div>
-        <div class="col-md-2">
-          <label class="form-label text-muted small">การขนส่ง (Shipping)</label>
-          <select name="shipping_type" class="form-select bg-dark text-white border-secondary" 
-            {% if po.status != "Pending" %} disabled {% endif %}>
-            <option value="CAR" {% if po.shipping_type == "CAR" %}selected{% endif %}>Car (รถ)</option>
-            <option value="SHIP" {% if po.shipping_type == "SHIP" %}selected{% endif %}>Ship (เรือ)</option>
-            <option value="AIR" {% if po.shipping_type == "AIR" %}selected{% endif %}>Air (เครื่องบิน)</option>
-          </select>
-        </div>
-        <div class="col-md-2">
-          <label class="form-label text-muted small">วันคาดการณ์ (Est. Date)</label>
-          <input type="date" name="estimated_date" class="form-control bg-dark text-white border-secondary"
-            value="{{ po.estimated_date|date:'Y-m-d'|default:'' }}" />
-        </div>
-        <div class="col-md-2">
-          <label class="form-label text-muted small">วันที่บิล (Bill Date)</label>
-          <input type="date" name="bill_date" class="form-control bg-dark text-white border-secondary"
-            value="{{ po.bill_date|date:'Y-m-d'|default:'' }}" />
-        </div>
+      
+      {% if po.order_type == 'IMPORTED' %}
+      <div class="col-md-2">
+        <label class="form-label text-muted small">การขนส่ง (Shipping)</label>
+        <select name="shipping_type" class="form-select bg-dark text-white border-secondary" 
+          {% if po.status != "Pending" %} disabled {% endif %}>
+          <option value="CAR" {% if po.shipping_type == "CAR" %}selected{% endif %}>Car (รถ)</option>
+          <option value="SHIP" {% if po.shipping_type == "SHIP" %}selected{% endif %}>Ship (เรือ)</option>
+          <option value="AIR" {% if po.shipping_type == "AIR" %}selected{% endif %}>Air (เครื่องบิน)</option>
+        </select>
       </div>
-
-      <hr class="border-secondary opacity-50" />
-
-      <!-- Row 2: Supplier -->
-      <h6 class="text-white mb-3 small opacity-75 px-3">
-        ข้อมูลร้านค้า / อ้างอิงราคา (Supplier / Pricing Ref)
-      </h6>
-      <div class="row g-3 mb-3 px-3">
-        <div class="col-md-4">
-          <label class="form-label text-muted small">Link Shop</label>
-          <input type="url" name="link_shop" class="form-control bg-dark text-white border-secondary"
-            placeholder="URL ร้านค้าจีน..." value="{{ po.link_shop }}" />
-        </div>
-        <div class="col-md-4">
-          <label class="form-label text-muted small">WeChat / Contact</label>
-          <input type="text" name="wechat_contact" class="form-control bg-dark text-white border-secondary"
-            value="{{ po.wechat_contact }}" />
-        </div>
-        <div class="col-md-4">
-          <label class="form-label text-muted small">แนบไฟล์ (Attach Files)</label>
-          <input type="file" name="attachments" multiple class="form-control bg-dark text-white border-secondary" />
-          <!-- Display Existing Attachments -->
-          {% if po.attachments.exists %}
-          <div class="mt-2">
-            <small class="text-muted">ไฟล์ที่แนบแล้ว:</small>
-            <div class="d-flex flex-wrap gap-2 mt-1">
-              {% for file in po.attachments.all %}
-              <a href="{{ file.file.url }}" target="_blank" class="badge bg-secondary text-decoration-none">
-                <i class="bi bi-paperclip"></i>
-                {{ file.filename|truncatechars:15 }}
-              </a>
-              {% endfor %}
-            </div>
-          </div>
+      {% endif %}
+      <div class="col-md-2">
+        <label class="form-label text-muted small">
+          {% if po.order_type == 'DOMESTIC' %}วันที่รับสินค้า (Received Date){% else %}วันคาดการณ์
           {% endif %}
-        </div>
+        </label>
+        <input type="date" name="estimated_date" class="form-control bg-dark text-white border-secondary"
+          value="{{ po.estimated_date|date:'Y-m-d'|default:'' }}" />
       </div>
-
-      <!-- Reference Prices -->
-      <div class="row g-3 px-3 pb-3">
-        <div class="col-md-3">
-          <label class="form-label text-muted small">ราคา Shopee (Ref)</label>
-          <input type="number" step="0.01" name="shopee_price" class="form-control bg-dark text-white border-secondary"
-            value="{{ po.ref_price_shopee|default:'' }}" />
-        </div>
-        <div class="col-md-3">
-          <label class="form-label text-muted small">ราคา Lazada (Ref)</label>
-          <input type="number" step="0.01" name="lazada_price" class="form-control bg-dark text-white border-secondary"
-            value="{{ po.ref_price_lazada|default:'' }}" />
-        </div>
-        <div class="col-md-3">
-          <label class="form-label text-muted small">ราคา TikTok (Ref)</label>
-          <input type="number" step="0.01" name="tiktok_price" class="form-control bg-dark text-white border-secondary"
-            value="{{ po.ref_price_tiktok|default:'' }}" />
-        </div>
-        <div class="col-md-3">
-          <label class="form-label text-muted small">หมายเหตุ (Note)</label>
-          <input type="text" name="note" class="form-control bg-dark text-white border-secondary"
-            value="{{ po.note }}" />
-        </div>
+      <div class="col-md-2">
+        <label class="form-label text-muted small">วันที่บิล (Bill Date)</label>
+        <input type="date" name="bill_date" class="form-control bg-dark text-white border-secondary"
+          value="{{ po.bill_date|date:'Y-m-d'|default:'' }}" />
       </div>
-
-      <hr class="border-secondary opacity-50" />
-
-      <!-- Row 3: Financial -->
-      <h6 class="text-white mb-3 small opacity-75 px-3">
-        ข้อมูลการเงิน (Financial)
-      </h6>
-      <div class="row g-3 mb-3 px-3">
-        <div class="col-md-4">
-          <label class="form-label text-muted small">เรทเงิน (Exchange Rate)</label>
-          <input type="number" step="0.0001" name="exchange_rate" id="input_exchange_rate"
-            class="form-control bg-dark text-white border-secondary" value="{{ po.exchange_rate }}" />
-        </div>
-        <div class="col-md-4">
-          <label class="form-label text-muted small">เรทค่าขนส่ง (บาท/คิว)</label>
-          <input type="number" step="0.01" name="shipping_rate_thb_cbm"
-            class="form-control bg-dark text-white border-secondary" value="{{ po.shipping_rate_thb_cbm }}" />
-        </div>
-        <div class="col-md-4">
-          <label class="form-label text-muted small">ยอดหยวนรวม (Total Yuan)</label>
-          <input type="number" step="0.01" name="total_yuan"
-            class="form-control bg-dark text-white border-secondary fw-bold text-success" value="{{ po.total_yuan }}" />
-          <small class="text-muted">แก้ไขค่านี้ระบบจะเฉลี่ยต้นทุนใหม่ (Triggers Proration)</small>
-        </div>
-      </div>
-
     </div>
+
+    <hr class="border-secondary opacity-50" />
+
+    <!-- Row 2: Supplier -->
+    <h6 class="text-white mb-3 small opacity-75">
+      ข้อมูลร้านค้า / อ้างอิงราคา (Supplier / Pricing Ref)
+    </h6>
+    <div class="row g-3 mb-3">
+      <div class="col-md-4">
+        <label class="form-label text-muted small">Link Shop</label>
+        <input type="url" name="link_shop" class="form-control bg-dark text-white border-secondary"
+          placeholder="URL ร้านค้าจีน..." value="{{ po.link_shop }}" />
+      </div>
+      <div class="col-md-4">
+        <label class="form-label text-muted small">WeChat / Contact</label>
+        <input type="text" name="wechat_contact" class="form-control bg-dark text-white border-secondary"
+          value="{{ po.wechat_contact }}" />
+      </div>
+      <div class="col-md-4">
+        <label class="form-label text-muted small">แนบไฟล์ (Attach Files)</label>
+        <input type="file" name="attachments" multiple class="form-control bg-dark text-white border-secondary" />
+        <!-- Display Existing Attachments -->
+        {% if po.attachments.exists %}
+        <div class="mt-2">
+          <small class="text-muted">ไฟล์ที่แนบแล้ว:</small>
+          <div class="d-flex flex-wrap gap-2 mt-1">
+            {% for file in po.attachments.all %}
+            <a href="{{ file.file.url }}" target="_blank" class="badge bg-secondary text-decoration-none">
+              <i class="bi bi-paperclip"></i>
+              {{ file.filename|truncatechars:15 }}
+            </a>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Reference Prices -->
+    <div class="row g-3  pb-3">
+      <div class="col-md-3">
+        <label class="form-label text-muted small">ราคา Shopee (Ref)</label>
+        <input type="number" step="0.01" name="shopee_price" class="form-control bg-dark text-white border-secondary"
+          value="{{ po.ref_price_shopee|default:'' }}" />
+      </div>
+      <div class="col-md-3">
+        <label class="form-label text-muted small">ราคา Lazada (Ref)</label>
+        <input type="number" step="0.01" name="lazada_price" class="form-control bg-dark text-white border-secondary"
+          value="{{ po.ref_price_lazada|default:'' }}" />
+      </div>
+      <div class="col-md-3">
+        <label class="form-label text-muted small">ราคา TikTok (Ref)</label>
+        <input type="number" step="0.01" name="tiktok_price" class="form-control bg-dark text-white border-secondary"
+          value="{{ po.ref_price_tiktok|default:'' }}" />
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label text-muted small">หมายเหตุ (Note)</label>
+        <input type="text" name="note" class="form-control bg-dark text-white border-secondary" value="{{ po.note }}" />
+      </div>
+    </div>
+
+    
+    <hr class="border-secondary opacity-50" />
+
+    <!-- Row 3: Financial -->
+    <h6 class="text-white mb-3 small opacity-75">
+      ข้อมูลการเงิน (Financial)
+    </h6>
+    {% if po.order_type == 'IMPORTED' %}
+    <div class="row g-3 mb-3">
+      <div class="col-md-2">
+        <label class="form-label text-muted small">เรทเงิน (Exchange Rate)</label>
+        <input type="number" step="0.0001" name="exchange_rate" id="input_exchange_rate"
+          class="form-control bg-dark text-white border-secondary" value="{{ po.exchange_rate }}" />
+      </div>
+      <div class="col-md-2">
+        <label class="form-label text-muted small">เรทค่าขนส่ง (บาท/คิว)</label>
+        <input type="number" step="0.01" name="shipping_rate_thb_cbm"
+          class="form-control bg-dark text-white border-secondary" value="{{ po.shipping_rate_thb_cbm }}" />
+      </div>
+      <div class="col-md-2">
+        <label class="form-label text-muted small">ยอดหยวนรวม (Total Yuan)</label>
+        <input type="number" step="0.01" name="total_yuan"
+          class="form-control bg-dark text-white border-secondary fw-bold text-success" value="{{ po.total_yuan }}" />
+        <small class="text-muted">แก้ไขค่านี้ระบบจะเฉลี่ยต้นทุนใหม่ (Triggers Proration)</small>
+      </div>
+      {% endif %}
+
+      {% if po.order_type == 'DOMESTIC' %}
+      <div class="col-md-2">
+        <label class="form-label text-muted small">VAT (%)</label>
+        <input type="number" step="0.01" name="vat_rate" class="form-control bg-dark text-white border-secondary"
+          value="{{ po.vat_rate|default:'7.00' }}" />
+      </div>
+      {% endif %}
+    </div>
+    
+
+  </div>
   </div>
 </form>
 
@@ -203,6 +221,12 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
             <th rowspan="3" class="bg-secondary bg-opacity-10" style="width: 100px">รูป</th>
             <th rowspan="3" class="bg-secondary bg-opacity-10">รหัสสินค้า / ชื่อสินค้า</th>
             <th rowspan="3" class="bg-secondary bg-opacity-10" style="width: 100px">จำนวนสั่ง</th>
+
+            
+            <th rowspan="3" class="bg-secondary bg-opacity-10" style="width: 100px">ราคา/หน่วย</th>
+            <th rowspan="3" class="bg-secondary bg-opacity-10" style="width: 100px">รวม (บาท)</th>
+            {% comment %} {% if po.order_type == 'DOMESTIC' %}
+            {% endif %} {% endcomment %}
 
             <th rowspan="3" class="bg-success bg-opacity-25 border-success text-white" style="width: 120px">
               <div class="fw-bold">รวม</div>
@@ -292,6 +316,15 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
               <div class="fw-bold">{{ item.qty_ordered }}</div>
               <div class="text-warning" style="font-size: 0.7rem;">Left: {{ item.remaining_qty }}</div>
             </td>
+            <td class="text-end bg-secondary bg-opacity-10">
+              <div class="small">{{ item.unit_cost_thb|floatformat:2|intcomma }}</div>
+            </td>
+            <td class="text-end bg-secondary bg-opacity-10">
+              <!-- Calculate Total: Price * Qty + VAT. Using price_baht which should store this -->
+              <div class="fw-bold text-success">{{ item.price_baht|floatformat:2|intcomma }}</div>
+            </td>
+            {% comment %} {% if po.order_type == 'DOMESTIC' %}
+            {% endif %} {% endcomment %}
 
             <td class="bg-success bg-opacity-10 border-success p-2">
               <div

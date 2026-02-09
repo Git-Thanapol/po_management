@@ -11,87 +11,40 @@ Summary - JST System{% endblock %} {% block content %}
           <label class="form-label">สถานะ (Status)</label>
           <select name="status" class="form-select">
             <option value="">ทั้งหมด (All)</option>
-            <option
-              value="empty"
-              {%
-              if
-              selected_status=""
-              ="empty"
-              %}selected{%
-              endif
-              %}
-            >
-              🔴 หมดเกลี้ยง
-            </option>
-            <option
-              value="low"
-              {%
-              if
-              selected_status=""
-              ="low"
-              %}selected{%
-              endif
-              %}
-            >
-              ⚠️ ของใกล้หมด
-            </option>
-            <option
-              value="ok"
-              {%
-              if
-              selected_status=""
-              ="ok"
-              %}selected{%
-              endif
-              %}
-            >
-              🟢 มีของ
-            </option>
+            <option value="empty" {% if selected_status == "empty" %}selected{% endif %}>🔴 หมดเกลี้ยง</option>
+            <option value="low" {% if selected_status == "low" %}selected{% endif %}>⚠️ ของใกล้หมด</option>
+            <option value="ok" {% if selected_status == "ok" %}selected{% endif %}>🟢 มีของ</option>
           </select>
         </div>
         <div class="col-md-3">
           <label class="form-label">หมวดหมู่สินค้า</label>
           <select name="category" class="form-select">
-            <option value="" {% if not selected_category %}selected{% endif %}>
-              แสดงทั้งหมด
-            </option>
+            <option value="" {% if not selected_category %}selected{% endif %}>แสดงทั้งหมด</option>
             {% for cat in categories %} {% if cat %}
-            <option
-              value="{{ cat }}"
-              {%
-              if
-              cat=""
-              ="selected_category"
-              %}selected{%
-              endif
-              %}
-            >
-              {{ cat }}
-            </option>
+            <option value="{{ cat }}" {% if cat == selected_category %}selected{% endif %}>{{ cat }}</option>
             {% endif %} {% endfor %}
           </select>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
           <label class="form-label">ค้นหา (Search)</label>
-          <input
-            type="text"
-            name="search"
-            class="form-control"
-            value="{{ search_query }}"
-            placeholder="SKU หรือ ชื่อสินค้า..."
-          />
+          <input type="text" name="search" class="form-control" value="{{ search_query }}"
+            placeholder="SKU หรือ ชื่อสินค้า..." />
         </div>
-        <div class="col-md-2 d-flex align-items-end">
-          <div class="d-flex gap-2">
+
+        <div class="col-md-3 d-flex align-items-end px-3">
+          <div class="d-flex w-100 gap-2">
+            <div class="form-check d-flex align-items-center flex-grow-1" style="height: 38px;">
+              <input class="form-check-input me-2" type="checkbox" name="fav" value="true" id="favCheck" 
+              {% if show_fav %}checked{% endif %}>
+              <label class="form-check-label text-warning user-select-none px-3" for="favCheck">
+                <i class="bi bi-heart-fill"></i> รายการโปรด
+              </label>
+            </div>
             <button type="submit" class="btn btn-primary flex-grow-1">
-              ค้นหา
+              <i class="bi bi-search"></i> ค้นหา
             </button>
-            <button
-              type="submit"
-              form="bulkUpdateForm"
-              class="btn btn-success flex-grow-1"
-            >
-              <i class="bi bi-save"></i> บันทึกจุดเตือน
+            <button type="button" class="btn btn-success flex-grow-1" onclick="triggerManualSave()">
+              <i class="bi bi-save"></i> บันทึก
             </button>
           </div>
         </div>
@@ -102,89 +55,101 @@ Summary - JST System{% endblock %} {% block content %}
     <div class="card shadow-sm">
       <div class="card-body p-0">
         <div class="table-responsive">
-          <table class="table table-hover table-striped align-middle mb-0">
-            <thead class="table-dark text-nowrap">
+          <table class="table table-hover table-striped align-middle mb-0" style="font-size: 0.9rem;">
+            <thead class="table-dark text-nowrap text-center">
               <tr>
-                <th class="text-center" style="width: 60px">ประวัติ</th>
+                <th style="width: 50px;">ประวัติ</th>
+                <th style="width: 50px;">Fav</th>
                 <th>รหัส</th>
                 <th>รูป</th>
                 <th>ชื่อสินค้า</th>
-                <th class="text-center">คงเหลือ</th>
-                <th class="text-center">รับเข้า</th>
-                <th class="text-center">ยอดขาย</th>
-                <th class="text-center" style="width: 100px">จุดเตือน</th>
-                <th class="text-center">สถานะ</th>
+                <th style="width: 80px;">สถานะ</th>
+                <th style="width: 80px;">สต็อกคงเหลือ</th>
+                <th style="width: 80px;">รอเข้า</th>
+                <th style="width: 80px;">แจ้งเตือนสต็อกต่ำ‼️</th>
+                <!-- New Notes Columns -->
+                <th style="min-width: 150px;">หมายเหตุ 1</th>
+                <th style="min-width: 150px;">หมายเหตุ 2</th>
               </tr>
             </thead>
             <tbody>
-              <form
-                id="bulkUpdateForm"
-                action="{% url 'update_min_limit' 'bulk' %}"
-                method="post"
-              >
-                {% csrf_token %} {% for item in stock_items %}
-                <tr>
-                  <td class="text-center">
-                    <button
-                      type="button"
-                      class="btn btn-sm btn-outline-warning border-0"
-                      onclick="loadHistory('{{ item.sku }}')"
-                    >
-                      <i class="bi bi-journal-text fs-5"></i>
-                    </button>
-                  </td>
-                  <td class="fw-bold text-primary">{{ item.sku }}</td>
-                  <td>
-                    {% if item.image_url %}
-                    <img
-                      src="{{ item.image_url }}"
-                      alt="{{ item.sku }}"
-                      class="rounded"
-                      style="height: 40px; width: 40px; object-fit: cover"
-                    />
-                    {% else %}
-                    <span class="text-muted small">No Image</span>
-                    {% endif %}
-                  </td>
-                  <td>{{ item.name|truncatechars:40 }}</td>
-                  <td class="text-center fw-bold fs-5">
-                    {{ item.qty|intcomma }}
-                  </td>
-                  <td class="text-center text-info">
-                    +{{ item.total_received|intcomma }}
-                  </td>
-                  <td class="text-center text-success">
-                    -{{ item.total_sales|intcomma }}
-                  </td>
-                  <td class="text-center">
-                    <input
-                      type="number"
-                      name="limit_{{ item.sku }}"
-                      class="form-control form-control-sm text-center mx-auto"
-                      style="width: 70px"
-                      value="{{ item.min_limit }}"
-                    />
-                  </td>
-                  <td class="text-center">
-                    {% if "ใกล้" in item.status %}
-                    <span class="badge rounded-pill bg-warning text-dark"
-                      >ใกล้หมด</span
-                    >
-                    {% elif "หมด" in item.status %}
-                    <span class="badge rounded-pill bg-danger">หมด</span>
-                    {% else %}
-                    <span class="badge rounded-pill bg-success">ปกติ</span>
-                    {% endif %}
-                  </td>
-                </tr>
-                {% empty %}
-                <tr>
-                  <td colspan="9" class="text-center py-4 text-muted">
-                    ไม่พบข้อมูล
-                  </td>
-                </tr>
-                {% endfor %}
-              </form>
+              {% for item in stock_items %}
+              <tr>
+                <td class="text-center">
+                  <button type="button" class="btn btn-sm btn-outline-warning border-0 p-0"
+                    onclick="loadHistory('{{ item.sku }}')">
+                    <i class="bi bi-clock-history fs-5"></i>
+                  </button>
+                </td>
+
+                <!-- Favourite Toggle -->
+                <td class="text-center">
+                  <i class="bi {% if item.is_favourite %}bi-heart-fill text-danger{% else %}bi-heart text-secondary{% endif %} fs-5 cursor-pointer fav-btn"
+                    data-sku="{{ item.sku }}" onclick="toggleFav(this)"></i>
+                </td>
+
+                <td class="fw-bold text-primary">{{ item.sku }}</td>
+
+                <td class="text-center">
+                  {% if item.image_url %}
+                  <img src="{{ item.image_url }}" class="rounded"
+                    style="height: 35px; width: 35px; object-fit: cover" />
+                  {% else %}
+                  <span class="text-muted small">-</span>
+                  {% endif %}
+                </td>
+
+                <td>{{ item.name|truncatechars:30 }}</td>
+
+                <td class="text-center">
+                  {% if item.status_code == 'out_of_stock' %}
+                  <span class="badge rounded-pill bg-danger">หมด</span>
+                  {% elif item.status_code == 'low_stock' %}
+                  <span class="badge rounded-pill bg-warning text-dark">ใกล้หมด</span>
+                  {% else %}
+                  <span class="badge rounded-pill bg-success">ปกติ</span>
+                  {% endif %}
+                </td>
+
+                <td
+                  class="text-center fw-bold {% if item.current_stock <= 0 %}text-danger{% elif item.current_stock <= item.min_limit %}text-warning{% else %}text-white{% endif %}">
+                  {{ item.current_stock|intcomma }}
+                </td>
+
+                <!-- Pending Qty -->
+                <td class="text-center text-info">
+                  {{ item.qty_pending|default:"0"|intcomma }}
+                </td>
+
+                <!-- Min Limit (Editable) -->
+                <td class="text-center">
+                  <input type="number" class="form-control form-control-sm text-center mx-auto note-input"
+                    style="width: 70px;" data-sku="{{ item.sku }}" data-field="min_limit" value="{{ item.min_limit }}">
+                </td>
+
+                <!-- Note 1 -->
+                <td>
+                  <input type="text"
+                    class="form-control form-control-sm bg-transparent text-white border-secondary note-input"
+                    data-sku="{{ item.sku }}" data-field="note1" value="{{ item.note1|default:'' }}">
+                </td>
+
+                <!-- Note 2 -->
+                <td>
+                  <input type="text"
+                    class="form-control form-control-sm bg-transparent text-white border-secondary note-input"
+                    data-sku="{{ item.sku }}" data-field="note2" value="{{ item.note2|default:'' }}">
+                </td>
+
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="11" class="text-center py-5 text-muted">
+                  <i class="bi bi-box-seam fs-1 d-block mb-2"></i>
+                  ไม่พบข้อมูลสินค้า (No Stock Data)
+                </td>
+              </tr>
+              {% endfor %}
             </tbody>
           </table>
         </div>
@@ -194,25 +159,12 @@ Summary - JST System{% endblock %} {% block content %}
 </div>
 
 <!-- History Modal -->
-<div
-  class="modal fade"
-  id="historyModal"
-  tabindex="-1"
-  aria-labelledby="historyModalLabel"
-  aria-hidden="true"
->
+<div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content bg-dark text-light border-secondary">
       <div class="modal-header border-secondary">
-        <h5 class="modal-title" id="historyModalLabel">
-          ประวัติการสั่งซื้อสินค้า
-        </h5>
-        <button
-          type="button"
-          class="btn-close btn-close-white"
-          data-bs-dismiss="modal"
-          aria-label="Close"
-        ></button>
+        <h5 class="modal-title">ประวัติการสั่งซื้อสินค้า</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body p-0">
         <!-- Content loaded via AJAX -->
@@ -221,36 +173,124 @@ Summary - JST System{% endblock %} {% block content %}
   </div>
 </div>
 
+<style>
+  .cursor-pointer {
+    cursor: pointer;
+  }
+
+  .fav-btn:hover {
+    transform: scale(1.2);
+    transition: transform 0.2s;
+  }
+
+  .note-input:focus {
+    background-color: #2b3035 !important;
+    border-color: #0d6efd !important;
+    box-shadow: none;
+  }
+</style>
+
 <script>
+  // CSRF Token Helper
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+  const csrftoken = getCookie('csrftoken');
+
+  function updateField(sku, field, value) {
+    const formData = new FormData();
+    formData.append('action', 'update_field');
+    formData.append('sku', sku);
+    formData.append('field', field);
+    formData.append('value', value);
+
+    fetch(window.location.href, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrftoken,
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: formData
+    })
+      .then(response => response.json())
+      .then(data => {
+        if (!data.success) {
+          alert("Error updating: " + data.error);
+        }
+      })
+      .catch(error => console.error('Error:', error));
+  }
+
+  function toggleFav(element) {
+    const sku = element.dataset.sku;
+    const isFav = element.classList.contains('bi-heart-fill');
+    const newValue = !isFav;
+
+    // Update UI immediately (Optimistic)
+    if (newValue) {
+      element.classList.replace('bi-heart', 'bi-heart-fill');
+      element.classList.replace('text-secondary', 'text-danger');
+    } else {
+      element.classList.replace('bi-heart-fill', 'bi-heart');
+      element.classList.replace('text-danger', 'text-secondary');
+    }
+
+    updateField(sku, 'is_favourite', newValue);
+  }
+
+  function triggerManualSave() {
+    // Force blur on active element to ensure last edit is saved
+    if (document.activeElement) {
+      document.activeElement.blur();
+    }
+
+    // Find the manual save button using onclick attribute since we don't have a unique ID
+    const btn = document.querySelector('button[onclick="triggerManualSave()"]');
+    if (btn) {
+      const originalText = btn.innerHTML;
+      const originalClass = btn.className;
+
+      // Show Saved State
+      btn.innerHTML = '<i class="bi bi-check-circle"></i> บันทึกแล้ว!';
+      btn.className = 'btn btn-outline-success flex-grow-1';
+
+      setTimeout(() => {
+        btn.innerHTML = originalText;
+        btn.className = originalClass;
+      }, 2000);
+    }
+  }
+
+  // Handle Note Blur
+  document.querySelectorAll('.note-input').forEach(input => {
+    input.addEventListener('blur', function () {
+      const sku = this.dataset.sku;
+      const field = this.dataset.field;
+      const value = this.value;
+      updateField(sku, field, value);
+    });
+  });
+
   function loadHistory(sku) {
     const modalBody = document.querySelector("#historyModal .modal-body");
-    modalBody.innerHTML =
-      '<div class="text-center py-5"><div class="text-primary spinner-border" role="status"></div><p class="mt-2 text-muted">Loading History...</p></div>';
+    modalBody.innerHTML = '<div class="text-center py-5"><div class="text-primary spinner-border" role="status"></div><p class="mt-2 text-muted">Loading History...</p></div>';
+    new bootstrap.Modal(document.getElementById("historyModal")).show();
 
-    // Set Title
-    const modalTitle = document.querySelector("#historyModalLabel");
-    modalTitle.textContent = "ประวัติการสั่งซื้อสินค้า: " + sku;
-
-    // Show Modal
-    var myModal = new bootstrap.Modal(document.getElementById("historyModal"));
-    myModal.show();
-
-    // Fetch Data (Mounted at root)
-    const url = `/stock/history/${encodeURIComponent(sku)}/`;
-    fetch(url)
-      .then((response) => {
-        if (!response.ok) throw new Error("Network response was not ok");
-        return response.text();
-      })
-      .then((html) => {
-        modalBody.innerHTML = html;
-      })
-      .catch((error) => {
-        modalBody.innerHTML =
-          '<div class="alert alert-danger m-3">Error loading history: ' +
-          error +
-          "</div>";
-      });
+    fetch(`/stock/history/${encodeURIComponent(sku)}/`)
+      .then(res => res.text())
+      .then(html => modalBody.innerHTML = html)
+      .catch(err => modalBody.innerHTML = '<div class="alert alert-danger m-3">Error: ' + err + '</div>');
   }
 </script>
 {% endblock %}

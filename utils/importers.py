@@ -245,13 +245,25 @@ class ImportService:
                 except MasterItem.DoesNotExist:
                      master_item = MasterItem.objects.create(product_code=code, name=row.get('ชื่อสินค้า', f"Unknown {code}"))
                 
-                JSTStockSnapshot.objects.create(
-                    sku=master_item,
-                    quantity=row.get('จํานวนที่ใช้ได้', 0),
-                    jst_min_limit=row.get('จำนวนน้อยสุดในการเติมสินค้า (MIN)', 0),
-                    note=row.get('หมายเหตุสินค้า', ''),
-                    # raw_type=row.get('Type', '')
-                )
+                # Check for existing snapshot for today
+                snapshot = JSTStockSnapshot.objects.filter(sku=master_item, snapshot_date=today).first()
+                if snapshot:
+                    snapshot.quantity = row.get('จํานวนที่ใช้ได้', 0)
+                    snapshot.jst_min_limit = row.get('จำนวนน้อยสุดในการเติมสินค้า (MIN)', 0)
+                    snapshot.note = row.get('หมายเหตุสินค้า', '')
+                    snapshot.save()
+                else:
+                    JSTStockSnapshot.objects.create(
+                        sku=master_item,
+                        quantity=row.get('จํานวนที่ใช้ได้', 0),
+                        jst_min_limit=row.get('จำนวนน้อยสุดในการเติมสินค้า (MIN)', 0),
+                        note=row.get('หมายเหตุสินค้า', ''),
+                        # raw_type=row.get('Type', '')
+                    )
+
+                # Sync MasterItem current_stock to match JST (Source of Truth)
+                master_item.current_stock = row.get('จํานวนที่ใช้ได้', 0)
+                master_item.save()
                 
                 results["success"] += 1
             except Exception as e:

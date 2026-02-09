@@ -41,9 +41,8 @@
               </select>
             </div>
             <div class="col-md-2">
-              <label class="form-label">วันคาดการณ์ (Est. Date)
-                <span class="text-danger">*</span></label>
-              <input type="date" name="estimated_date" class="form-control" id="estimated_date" required />
+              <label class="form-label" id="date_label_ref">วันที่รับสินค้า</label>
+              <input type="date" name="estimated_date" class="form-control" id="estimated_date" />
             </div>
             <div class="col-md-2">
               <label class="form-label">วันที่บิลเรียกเก็บ (Bill Date) <span class="badge bg-info">New</span></label>
@@ -87,6 +86,7 @@
               <label class="form-label">ราคา TikTok (Ref)</label>
               <input type="number" step="0.01" name="tiktok_price" class="form-control" />
             </div>
+
             <div class="col-md-3">
               <label class="form-label">หมายเหตุ (Note)</label>
               <textarea name="note" class="form-control" rows="1"></textarea>
@@ -119,6 +119,15 @@
                 oninput="recalcAll()" />
               <small class="text-muted">ระบบจะเฉลี่ยยอดนี้ให้สินค้าตามจำนวน (Prorate to Items)</small>
             </div>
+            <div class="col-md-3 domestic-field">
+              <label class="form-label">VAT</label>
+              <div class="input-group">
+                <span class="input-group-text">มี VAT</span>
+                <input type="number" step="0.01" name="vat_rate" id="vat_rate" class="form-control" value="7.00"
+                  oninput="recalcAll()">
+                <span class="input-group-text">%</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -138,12 +147,20 @@
             <table class="table table-bordered mb-0" id="itemsTable" style="font-size: 0.9rem">
               <thead class="table-grey text-center">
                 <tr>
-                  <th style="width: 250px">รหัสสินค้า (SKU)</th>
-                  <th style="width: 100px">จำนวนสั่งซื้อ</th>
-                  <!-- Proration Preview Columns -->
-                  <th class="import-col" style="width: 120px">ราคาต่อหน่วย (¥)</th>
-                  <th class="import-col" style="width: 120px">ราคารวม (¥)</th>
-                  <th class="import-col" style="width: 120px">ราคารวม (฿)</th>
+                  <th style="width: 200px">รหัสสินค้า (SKU)</th>
+                  <th style="width: 80px">จำนวนสั่งซื้อ</th>
+
+                  <!-- Import Columns -->
+                  <th class="import-col" style="width: 100px">ราคาต่อหน่วย (¥)</th>
+                  <th class="import-col" style="width: 100px">ราคารวม (¥)</th>
+                  <th class="import-col" style="width: 100px">ราคารวม (฿)</th>
+
+                  <!-- Domestic Columns -->
+                  <th class="domestic-col" style="width: 100px">ราคาต่อหน่วย</th>
+                  <th class="domestic-col" style="width: 100px">รวมจำนวนเงิน</th>
+                  <th class="domestic-col" style="width: 100px">ภาษีมูลค่าเพิ่ม</th>
+                  <th class="domestic-col" style="width: 100px">รวมยอดเงิน</th>
+
                   <th style="width: 50px">🗑️</th>
                 </tr>
               </thead>
@@ -154,9 +171,16 @@
                 <tr>
                   <td class="text-end">รวม:</td>
                   <td><span id="sumQty">0</span></td>
+
                   <td class="import-col"></td>
                   <td class="import-col"><span id="sumYuan">0.00</span></td>
                   <td class="import-col"><span id="sumBaht">0.00</span></td>
+
+                  <td class="domestic-col"></td>
+                  <td class="domestic-col"><span id="sumSubtotal">0.00</span></td>
+                  <td class="domestic-col"><span id="sumVat">0.00</span></td>
+                  <td class="domestic-col"><span id="sumTotal">0.00</span></td>
+
                   <td></td>
                 </tr>
               </tfoot>
@@ -195,6 +219,9 @@
     const tbody = document.getElementById("itemsBody");
     const tr = document.createElement("tr");
     tr.id = `row-${rowCount}`;
+
+    // We render ALL columns (both Import and Domestic) and rely on CSS hiding
+    // This simplifies the JS and avoids innerHTML string building complexity with conditionals
     tr.innerHTML = `
             <td>
                 <input list="skuList" name="sku_${rowCount}" class="form-control form-control-sm" required placeholder="Type SKU...">
@@ -202,6 +229,8 @@
             <td>
                 <input type="number" name="qty_${rowCount}" class="form-control form-control-sm text-center" min="1" value="1" oninput="recalcAll()">
             </td>
+            
+            <!-- Import Cols -->
             <td class="import-col">
                  <input type="text" id="view_unit_yuan_${rowCount}" class="form-control form-control-sm text-end border-0 bg-transparent" readonly value="0.00">
             </td>
@@ -211,92 +240,201 @@
              <td class="import-col">
                  <input type="text" id="view_total_baht_${rowCount}" class="form-control form-control-sm text-end border-0 bg-transparent" readonly value="0.00">
             </td>
+
+            <!-- Domestic Cols -->
+             <td class="domestic-col">
+                 <input type="number" step="0.01" name="unit_price_${rowCount}" class="form-control form-control-sm text-end" value="0.00" oninput="recalcAll()">
+            </td>
+             <td class="domestic-col">
+                 <input type="text" id="view_subtotal_${rowCount}" class="form-control form-control-sm text-end border-0 bg-transparent" readonly value="0.00">
+            </td>
+             <td class="domestic-col">
+                 <input type="text" id="view_vat_${rowCount}" class="form-control form-control-sm text-end border-0 bg-transparent" readonly value="0.00">
+            </td>
+             <td class="domestic-col">
+                 <input type="text" id="view_total_${rowCount}" class="form-control form-control-sm text-end border-0 bg-transparent" readonly value="0.00">
+            </td>
+
             <td class="text-center">
                 <button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="removeRow(${rowCount})">×</button>
             </td>
         `;
     tbody.appendChild(tr);
     document.getElementById("total_items").value = rowCount;
+    toggleImportFields(); // Ensure visibility of new row columns matches current mode
     recalcAll();
   }
 
   function removeRow(id) {
-    document.getElementById(`row-${id}`).remove();
+    const row = document.getElementById(`row-${id}`);
+    if (row) row.remove();
     recalcAll();
   }
 
   function toggleImportFields() {
-    // Logic if we want to hide Sections based on Type
-    // The prompt says "Section 1..3", assumes usually visible.
-    // We can keep them visible or follow old logic.
-    // Old logic hid 'import-field'.
-    // User Section 3 "Financial" implies needed for Import.
-    // Domestic might not need Total Yuan?
-    // Let's assume always visible for now to match user request structure.
+    const type = document.getElementById("order_type").value;
+    const isImport = (type === 'IMPORTED');
+
+    // 1. Classes to Show/Hide
+    const importFields = document.querySelectorAll('.import-field, .import-col');
+    const domesticFields = document.querySelectorAll('.domestic-field, .domestic-col');
+
+    // Show/Hide Imports
+    importFields.forEach(el => el.style.display = isImport ? '' : 'none');
+
+    // Show/Hide Domestic
+    domesticFields.forEach(el => el.style.display = isImport ? 'none' : '');
+
+    // Financial Section Hiding
+    // Import Specifics: Exchange Rate, Total Yuan, Shipping Rate
+    const exchRate = document.getElementById('exchange_rate');
+    const totalYuan = document.getElementById('total_yuan');
+    const shipRate = document.querySelector('input[name="shipping_rate_thb_cbm"]');
+
+    if (!isImport) {
+      // Domestic: Hide these
+      if (exchRate) exchRate.closest('.col-md-4').style.display = 'none';
+      if (totalYuan) totalYuan.closest('.col-md-4').style.display = 'none';
+      if (shipRate) shipRate.closest('.col-md-4').style.display = 'none';
+
+      const dateLabel = document.getElementById('date_label_ref');
+      if (dateLabel) dateLabel.innerText = "วันที่รับสินค้า";
+    } else {
+      // Import: Show
+      if (exchRate) exchRate.closest('.col-md-4').style.display = '';
+      if (totalYuan) totalYuan.closest('.col-md-4').style.display = '';
+      if (shipRate) shipRate.closest('.col-md-4').style.display = '';
+
+      const dateLabel = document.getElementById('date_label_ref');
+      if (dateLabel) dateLabel.innerText = "วันคาดการณ์ (Est. Date)";
+    }
+
+    recalcAll();
   }
 
   function calcEstimatedDate() {
     const orderDate = new Date(document.getElementById("order_date").value);
-    const shipType = document.getElementById("shipping_type").value;
-    let days = 0;
+    const shipTypeEl = document.getElementById("shipping_type");
+    const type = document.getElementById("order_type").value;
 
+    if (type !== 'IMPORTED' || !shipTypeEl) return;
+
+    const shipType = shipTypeEl.value;
+    let days = 0;
     if (shipType === "CAR") days = 14;
     if (shipType === "SHIP") days = 25;
 
     if (days > 0 && !isNaN(orderDate.getTime())) {
       orderDate.setDate(orderDate.getDate() + days);
-      document.getElementById("estimated_date").valueAsDate = orderDate;
+      const destDate = document.getElementById("estimated_date");
+      if (destDate) destDate.valueAsDate = orderDate;
     }
   }
 
-  document.getElementById("order_date").addEventListener("change", calcEstimatedDate);
+  const orderDateEl = document.getElementById("order_date");
+  if (orderDateEl) orderDateEl.addEventListener("change", calcEstimatedDate);
 
   function recalcAll() {
-    // 1. Get Global Values
-    const headerTotalYuan = parseFloat(document.getElementById("total_yuan").value) || 0;
-    const exchangeRate = parseFloat(document.getElementById("exchange_rate").value) || 1.0;
+    const type = document.getElementById("order_type").value;
+    const isImport = (type === 'IMPORTED');
 
-    // 2. Calculate Total Qty
+    // Common: Sum Qty
     let sumQty = 0;
     const qtyInputs = document.querySelectorAll('input[name^="qty_"]');
     qtyInputs.forEach(inp => {
       sumQty += parseFloat(inp.value) || 0;
     });
+    const sumQtyEl = document.getElementById("sumQty");
+    if (sumQtyEl) sumQtyEl.innerText = sumQty;
 
-    // 3. Update Rows (Proration)
-    let checkSumYuan = 0;
+    if (isImport) {
+      // IMPORT CALCULATION
+      const totalYuanEl = document.getElementById("total_yuan");
+      const exchRateEl = document.getElementById("exchange_rate");
 
-    qtyInputs.forEach(inp => {
-      const id = inp.name.split('_')[1];
-      const qty = parseFloat(inp.value) || 0;
+      const headerTotalYuan = totalYuanEl ? (parseFloat(totalYuanEl.value) || 0) : 0;
+      const exchangeRate = exchRateEl ? (parseFloat(exchRateEl.value) || 1.0) : 1.0;
 
-      let lineTotalYuan = 0;
-      let unitYuan = 0;
+      let checkSumYuan = 0;
 
-      if (sumQty > 0 && headerTotalYuan > 0) {
-        // Proration Formula
-        const ratio = qty / sumQty;
-        lineTotalYuan = headerTotalYuan * ratio;
-        if (qty > 0) unitYuan = lineTotalYuan / qty;
-      }
+      qtyInputs.forEach(inp => {
+        const id = inp.name.split('_')[1];
+        const qty = parseFloat(inp.value) || 0;
 
-      const lineTotalBaht = lineTotalYuan * exchangeRate;
+        let lineTotalYuan = 0;
+        let unitYuan = 0;
 
-      // Update View Inputs
-      document.getElementById(`view_unit_yuan_${id}`).value = unitYuan.toFixed(4);
-      document.getElementById(`view_total_yuan_${id}`).value = lineTotalYuan.toFixed(2);
-      document.getElementById(`view_total_baht_${id}`).value = lineTotalBaht.toFixed(2);
+        if (sumQty > 0 && headerTotalYuan > 0) {
+          const ratio = qty / sumQty;
+          lineTotalYuan = headerTotalYuan * ratio;
+          if (qty > 0) unitYuan = lineTotalYuan / qty;
+        }
+        const lineTotalBaht = lineTotalYuan * exchangeRate;
 
-      checkSumYuan += lineTotalYuan;
-    });
+        const vUnitYuan = document.getElementById(`view_unit_yuan_${id}`);
+        const vTotalYuan = document.getElementById(`view_total_yuan_${id}`);
+        const vTotalBaht = document.getElementById(`view_total_baht_${id}`);
 
-    // 4. Update Footer Totals
-    document.getElementById("sumQty").innerText = sumQty;
-    document.getElementById("sumYuan").innerText = checkSumYuan.toFixed(2);
-    document.getElementById("sumBaht").innerText = (checkSumYuan * exchangeRate).toFixed(2);
+        if (vUnitYuan) vUnitYuan.value = unitYuan.toFixed(4);
+        if (vTotalYuan) vTotalYuan.value = lineTotalYuan.toFixed(2);
+        if (vTotalBaht) vTotalBaht.value = lineTotalBaht.toFixed(2);
+
+        checkSumYuan += lineTotalYuan;
+      });
+
+      const sumYuanEl = document.getElementById("sumYuan");
+      const sumBahtEl = document.getElementById("sumBaht");
+      if (sumYuanEl) sumYuanEl.innerText = checkSumYuan.toFixed(2);
+      if (sumBahtEl) sumBahtEl.innerText = (checkSumYuan * exchangeRate).toFixed(2);
+
+    } else {
+      // DOMESTIC CALCULATION
+      const vatRateEl = document.getElementById("vat_rate");
+      const vatRate = vatRateEl ? (parseFloat(vatRateEl.value) || 0) : 0;
+
+      let sumSubtotal = 0;
+      let sumVat = 0;
+      let sumTotal = 0;
+
+      qtyInputs.forEach(inp => {
+        const id = inp.name.split('_')[1];
+        const qty = parseFloat(inp.value) || 0;
+
+        const unitPriceEl = document.getElementsByName(`unit_price_${id}`)[0];
+        const unitPrice = unitPriceEl ? (parseFloat(unitPriceEl.value) || 0) : 0;
+
+        const subtotal = qty * unitPrice;
+        const vat = subtotal * (vatRate / 100);
+        const total = subtotal + vat;
+
+        const vSubtotal = document.getElementById(`view_subtotal_${id}`);
+        const vVat = document.getElementById(`view_vat_${id}`);
+        const vTotal = document.getElementById(`view_total_${id}`);
+
+        if (vSubtotal) vSubtotal.value = subtotal.toFixed(2);
+        if (vVat) vVat.value = vat.toFixed(2);
+        if (vTotal) vTotal.value = total.toFixed(2);
+
+        sumSubtotal += subtotal;
+        sumVat += vat;
+        sumTotal += total;
+      });
+
+      const sumSubEl = document.getElementById("sumSubtotal");
+      const sumVatEl = document.getElementById("sumVat");
+      const sumTotalEl = document.getElementById("sumTotal");
+
+      if (sumSubEl) sumSubEl.innerText = sumSubtotal.toFixed(2);
+      if (sumVatEl) sumVatEl.innerText = sumVat.toFixed(2);
+      if (sumTotalEl) sumTotalEl.innerText = sumTotal.toFixed(2);
+    }
   }
 
   // Init
-  addItemRow(); // Start with one row
+  window.addEventListener('load', () => {
+    addItemRow(); // Start with one row
+    // toggleImportFields called inside addItemRow but also good to call explicitly if order_type has default
+    // toggleImportFields(); 
+  });
 </script>
 {% endblock %}
