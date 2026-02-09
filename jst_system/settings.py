@@ -31,6 +31,7 @@ ALLOWED_HOSTS = ['*'] # In production, set this to your domain or IP
 CSRF_TRUSTED_ORIGINS = [
     'http://103.114.201.9:8001',
     'http://103.114.201.9',
+    'https://103.114.201.9', # Added for HTTPS
 ]
 
 # Static files (CSS, JavaScript, Images)
