@@ -18,6 +18,15 @@ class MasterItem(models.Model):
     
     note = models.TextField(blank=True, null=True, verbose_name="Note")
     
+    # Status
+    STATUS_ACTIVE = 'ACTIVE'
+    STATUS_DISCONTINUED = 'DISCONTINUED'
+    STATUS_CHOICES = [
+        (STATUS_ACTIVE, 'Active (ขายปกติ)'),
+        (STATUS_DISCONTINUED, 'Discontinued (เลิกขาย)'),
+    ]
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_ACTIVE, verbose_name="สถานะสินค้า")
+
     # New Fields for Stock Report Enhancements
     is_favourite = models.BooleanField(default=False, verbose_name="รายการโปรด")
     note1 = models.TextField(blank=True, null=True, verbose_name="หมายเหตุ 1")

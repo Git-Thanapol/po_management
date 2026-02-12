@@ -11,9 +11,17 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
       </span>
     </div>
     <div>
-      <a href="{% url 'po_list' %}" class="btn btn-outline-light">
-        <i class="bi bi-arrow-left"></i> ย้อนกลับ
-      </a>
+      <div class="d-flex gap-2">
+        <form action="{% url 'delete_po' po.id %}" method="post" onsubmit="return confirm('⚠️ คำเตือน!\n\nคุณกำลังจะลบใบสั่งซื้อนี้ (PO #{{ po.po_number }})\n\nการกระทำนี้จะลบ:\n- รายการสินค้าทั้งหมดใน PO\n- ประวัติการรับสินค้าทั้งหมด\n\nยืนยันที่จะลบหรือไม่?');">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-outline-danger">
+            <i class="bi bi-trash"></i> ลบใบสั่งซื้อ
+          </button>
+        </form>
+        <a href="{% url 'po_list' %}" class="btn btn-outline-light">
+          <i class="bi bi-arrow-left"></i> ย้อนกลับ
+        </a>
+      </div>
     </div>
   </div>
 </div>

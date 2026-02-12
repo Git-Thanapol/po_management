@@ -737,6 +737,20 @@ def delete_received_item_view(request, receipt_id):
         return redirect('po_detail', po_id=po_id)
     return redirect('po_list')
 
+@login_required
+def delete_po_view(request, po_id):
+    if request.method == 'POST':
+        po = get_object_or_404(POHeader, id=po_id)
+        po_number = po.po_number
+        
+        # Delete PO (Cascades to Items and Receipts)
+        po.delete()
+        
+        messages.success(request, f"✅ ลบใบสั่งซื้อ {po_number} และข้อมูลที่เกี่ยวข้องเรียบร้อยแล้ว")
+        return redirect('po_list')
+    
+    return redirect('po_detail', po_id=po_id)
+
 def logout_view(request):
     logout(request)
     messages.info(request, "ออกจากระบบแล้ว")
@@ -758,6 +772,8 @@ def daily_sales_view(request):
         movement_filter = request.session.get('sales_movement', 'all')
         focus_date_str = request.session.get('sales_focus_date', '')
         selected_category = request.session.get('sales_category', '')
+        status_filter = request.session.get('sales_status', '')
+        show_fav = request.session.get('sales_fav', 'false') == 'true'
     else:
         # Load from GET or use Defaults (and save to session if GET is present, or just always save current state)
         # Using .get() returns None if missing, so we handle defaults below
@@ -768,6 +784,8 @@ def daily_sales_view(request):
         movement_filter = request.GET.get('movement', 'all')
         focus_date_str = request.GET.get('focus_date', '')
         selected_category = request.GET.get('category', '').strip()
+        status_filter = request.GET.get('status', '').strip()
+        show_fav = request.GET.get('fav') == 'true'
         
         # Save to session (only if meaningful? easier to always save current view state)
         request.session['sales_start_date'] = start_date_str
@@ -777,6 +795,8 @@ def daily_sales_view(request):
         request.session['sales_movement'] = movement_filter
         request.session['sales_focus_date'] = focus_date_str
         request.session['sales_category'] = selected_category
+        request.session['sales_status'] = status_filter
+        request.session['sales_fav'] = 'true' if show_fav else 'false'
     
     # Parse dates or use defaults
     try:
@@ -788,6 +808,10 @@ def daily_sales_view(request):
         end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date() if end_date_str else default_end
     except (ValueError, TypeError):
         end_date = default_end
+    
+    # Calculate number of days in range for average calculation
+    num_days = (end_date - start_date).days + 1
+    if num_days < 1: num_days = 1
     
     focus_date = None
     if focus_date_str:
@@ -806,6 +830,10 @@ def daily_sales_view(request):
     categories = MasterItem.objects.values_list('category', flat=True).distinct().order_by('category')
     if selected_category:
         products = products.filter(category=selected_category)
+        
+    # Favorites Filter
+    if show_fav:
+        products = products.filter(is_favourite=True)
         
     # 2. Annotate Total Period Sales/Qty
     products = products.annotate(
@@ -828,12 +856,6 @@ def daily_sales_view(request):
     
     # 4. Fetch Daily Sales Breakdown (Optimization)
     # Get all sales within the range for the filtered products
-    # To avoid N+1, we fetch all relevant sales and map them in Python
-    # Need to execute the product query first to get IDs? 
-    # Or just filter Sales by the same criteria? Filtering sales by product criteria is complex if search/category involved.
-    # Simple approach: Fetch sales for ALL products (or use product__in if list is small, but list might be large).
-    # Better: Fetch sales joined with product filters.
-    
     sales_qs = Sale.objects.filter(
         date__range=(start_date, end_date)
     ).values('sku_id', 'date', 'qty')
@@ -842,6 +864,10 @@ def daily_sales_view(request):
         sales_qs = sales_qs.filter(Q(sku__product_code__icontains=search_query) | Q(sku__name__icontains=search_query))
     if selected_category:
         sales_qs = sales_qs.filter(sku__category=selected_category)
+    if show_fav:
+         # Need to filter sales by fav status too if we want to be strict, but products list is already filtered.
+         # Sales mapping relies on sku_id, so it's fine.
+         pass
         
     # Build Sales Map: sales_map[product_id][date_obj] = qty
     sales_map = {}
@@ -853,10 +879,6 @@ def daily_sales_view(request):
         if p_id not in sales_map:
             sales_map[p_id] = {}
         
-        # Sales might appear multiple times per day if multiple Sale records?
-        # values('sku_id', 'date', 'qty') doesn't sum if not annotated.
-        # correctly: .values('sku_id', 'date').annotate(total_qty=Sum('qty'))
-        # But for now let's just sum it up here to be safe or fix the query.
         sales_map[p_id][d] = sales_map[p_id].get(d, 0) + q
 
     # 5. Generate Date Columns
@@ -865,17 +887,83 @@ def daily_sales_view(request):
     while curr <= end_date:
         date_columns.append(curr)
         curr += timedelta(days=1)
-        
-    # 6. Attach Daily Sales List to Products
-    # We need to evaluate the products queryset now
-    products = list(products) # Hit DB
+
+
+    # Prepare Pending Count Map (Incoming logic: count non-Complete items)
+    # User Request: "ให้นับจำนวนสินค้าทุกสถานะ ยกเว้น"เรียบร้อย" จากสรุปหน้ารายการสั่งซื้อ PO"
+    # Logic: Sum qty_ordered for items where PO Header Status != 'Complete'
+    # Wait, "Completed" status in PO means all received?
+    # Usually "Incoming" means not yet received.
+    # If PO is 'Pending' or 'Incomplete' or 'Arriving', it counts.
+    # If PO is 'Complete', it doesn't.
+    # We should exclude 'Complete' status.
+    incoming_items = POItem.objects.exclude(header__status='Complete').values('sku').annotate(
+        total_incoming=Sum('qty_ordered'),
+        total_received=Sum('total_received_qty')
+    )
+    # Incoming = Ordered - Received? Or just Ordered?
+    # Requirement: "ให้นับจำนวนสินค้าทุกสถานะ ยกเว้น เรียบร้อย" ... "จากสรุปหน้ารายการสั่งซื้อ PO"
+    # Usually Incoming = Ordered - Received.
+    # If I ordered 100, received 20, Incoming is 80.
+    # If PO is Complete, Incoming is 0.
+    # Let's calculate Remaining = Ordered - Received for non-Complete POs.
     
-    for p in products:
+    incoming_map = {}
+    for inc in incoming_items:
+        rem = (inc['total_incoming'] or 0) - (inc['total_received'] or 0)
+        if rem > 0:
+            incoming_map[inc['sku']] = rem
+
+    # 6. Attach Daily Sales List to Products and Filtering by Status IN PYTHON
+    # Because 'status' logic involves complex conditionals (discontinued field vs stock vs min_limit),
+    # and we can't easily filter by computed property in DB without huge annotations.
+    # The 'status' field in MasterItem helps for 'Discontinued', but 'Normal/Low/Empty' is dynamic based on stock.
+    
+    # We evaluate products now
+    products_list = list(products) # Hit DB
+    final_products = []
+    
+    for p in products_list:
+        # Determine Status
+        status_code = 'normal'
+        status_label = 'ปกติ'
+        
+        if p.status == 'DISCONTINUED':
+             status_code = 'discontinued'
+             status_label = 'เลิกขาย'
+        elif p.current_stock <= 0:
+             status_code = 'empty'
+             status_label = 'หมด'
+        elif p.current_stock <= p.min_limit:
+             status_code = 'low'
+             status_label = 'ใกล้หมด'
+        
+        # Apply Status Filter
+        if status_filter:
+            if status_filter == 'discontinued' and status_code != 'discontinued': continue
+            if status_filter == 'empty' and status_code != 'empty': continue
+            if status_filter == 'low' and status_code != 'low': continue
+            if status_filter == 'normal' and status_code != 'normal': continue
+            
+        # Attach Computed Fields
+        p.display_status_code = status_code
+        p.display_status_label = status_label
+        p.incoming_qty = incoming_map.get(p.pk, 0)
+        
+        # Sales Map
         p.daily_sales = []
         p_sales = sales_map.get(p.pk, {})
         for d in date_columns:
             qty = p_sales.get(d, 0)
             p.daily_sales.append(qty)
+            
+        # Avg Sales
+        if num_days > 0:
+             p.avg_sales = p.period_qty / num_days
+        else:
+             p.avg_sales = 0
+             
+        final_products.append(p)
             
     # Thai Date Headers
     thai_months_abbr = ["", "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."]
@@ -885,7 +973,7 @@ def daily_sales_view(request):
         date_headers.append(f"{d.day} {thai_months_abbr[d.month]}")
 
     context = {
-        'products': products,
+        'products': final_products,
         'start_date': start_date.strftime('%Y-%m-%d'),
         'end_date': end_date.strftime('%Y-%m-%d'),
         'date_headers': date_headers,
@@ -895,7 +983,10 @@ def daily_sales_view(request):
         'movement_filter': movement_filter,
         'filter_mode': filter_mode,
         'focus_date': focus_date_str,
-        'total_period_sales': sum(p.period_amount for p in products), # Calculate explicitly since queryset was evaluated
+        'status_filter': status_filter,
+        'show_fav': show_fav,
+        'num_days': num_days,
+        'total_period_sales': sum(p.period_amount for p in final_products), 
     }
     
     return render(request, 'inventory/sales_summary.html', context)

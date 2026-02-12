@@ -35,6 +35,9 @@ CSRF_TRUSTED_ORIGINS = [
     'http://103.114.201.9.nip.io',
     'https://103.114.201.9.nip.io',
     'http://103.114.201.9.nip.io:8001',
+    'https://103.114.201.9.nip.io:8001',
+    'http://*.nip.io',
+    'https://*.nip.io',
 ]
 
 # Static files (CSS, JavaScript, Images)
@@ -180,7 +183,7 @@ LOGGING = {
     'disable_existing_loggers': False,
     'handlers': {
         'file': {
-            'level': 'ERROR',
+            'level': 'INFO',
             'class': 'logging.FileHandler',
             'filename': BASE_DIR / 'debug.log',
         },

@@ -16,184 +16,109 @@
             <label class="form-label fw-bold">📅 ช่วงวันที่ (Date Range)</label>
             <div class="input-group">
               <span class="input-group-text">จาก</span>
-              <input
-                type="date"
-                name="start_date"
-                class="form-control"
-                value="{{ start_date }}"
-                onchange="this.form.submit()"
-              />
+              <input type="date" name="start_date" class="form-control" value="{{ start_date }}"
+                onchange="this.form.submit()" />
             </div>
           </div>
           <div class="col-md-2">
             <label class="form-label">&nbsp;</label>
             <div class="input-group">
               <span class="input-group-text">ถึง</span>
-              <input
-                type="date"
-                name="end_date"
-                class="form-control"
-                value="{{ end_date }}"
-                onchange="this.form.submit()"
-              />
+              <input type="date" name="end_date" class="form-control" value="{{ end_date }}"
+                onchange="this.form.submit()" />
             </div>
           </div>
           <div class="col-md-2">
             <label class="form-label fw-bold">📂 หมวดหมู่สินค้า</label>
-            <select
-              name="category"
-              class="form-select"
-              onchange="this.form.submit()"
-            >
-              <option
-                value=""
-                {%
-                if
-                not
-                selected_category
-                %}selected{%
-                endif
-                %}
-              >
+            <select name="category" class="form-select" onchange="this.form.submit()">
+              <option value="" {% if not selected_category %}selected{% endif %}>
                 -- แสดงทั้งหมด --
               </option>
               {% for cat in categories %} {% if cat %}
-              <option
-                value="{{ cat }}"
-                {%
-                if
-                cat=""
-                ="selected_category"
-                %}selected{%
-                endif
-                %}
-              >
+              <option value="{{ cat }}" {% if cat == "selected_category" %}selected{% endif %}>
                 {{ cat }}
               </option>
               {% endif %} {% endfor %}
             </select>
           </div>
+
+          <!-- Status Filter -->
+          <div class="col-md-2">
+            <label class="form-label fw-bold">สถานะสินค้า</label>
+            <select name="status" class="form-select form-select" onchange="this.form.submit()">
+              <option value="" {% if not status_filter %}selected{% endif %}>-- ทุกสถานะ --</option>
+              <option value="normal" {% if status_filter == 'normal' %}selected{% endif %}>🟢 ปกติ (Normal)
+              </option>
+              <option value="low" {% if status_filter == 'low' %}selected{% endif %}>🟠 ใกล้หมด (Low)</option>
+              <option value="empty" {% if status_filter == 'empty' %}selected{% endif %}>🔴 หมด (Out)</option>
+              <option value="discontinued" {% if status_filter == 'discontinued' %}selected{% endif %}>❌ เลิกขาย
+                (Discontinued)</option>
+            </select>
+          </div>
+
+          <!-- Fav Filter -->
+          <div class="col-md-2 text-center">
+            <label class="form-label fw-bold">รายการโปรด </label>
+            <input type="checkbox" class="btn-check" id="btn-check-fav" name="fav" value="true" 
+              {% if show_fav %}checked{% endif %} onchange="this.form.submit()" autocomplete="off">
+            <label class="btn btn btn-outline-danger w-100" for="btn-check-fav">
+              {% if show_fav %}❤️ แสดงเฉพาะรายการโปรด
+              {% else %}🤍 กรองเฉพาะรายการโปรด
+              {% endif %}
+            </label>
+          </div>
         </div>
+
 
         <!-- Row 2: Mode and Search -->
         <div class="row">
           <!-- Filter Mode -->
           <div class="col-md-4">
-            <label class="form-label fw-bold"
-              >🎯 โหมดการแสดงผล (Filter Mode)</label
-            >
+            <label class="form-label fw-bold">🎯 โหมดการแสดงผล (Filter Mode)</label>
             <div class="card bg-dark border-secondary p-2">
               <div class="btn-group w-100" role="group">
-                <input
-                  type="radio"
-                  class="btn-check"
-                  name="filter_mode"
-                  id="modeGeneral"
-                  value="general"
-                  {%
-                  if
-                  filter_mode=""
-                  ="general"
-                  %}checked{%
-                  endif
-                  %}
-                  onchange="
+                <input type="radio" class="btn-check" name="filter_mode" id="modeGeneral" value="general" 
+                  {% if filter_mode == "general" %}checked{% endif %} onchange="
                     toggleFilterMode();
                     this.form.submit();
-                  "
-                />
-                <label class="btn btn-outline-info" for="modeGeneral"
-                  >ทั่วไป (Movement)</label
-                >
+                  " />
+                <label class="btn btn-outline-info" for="modeGeneral">ทั่วไป (Movement)</label>
 
-                <input
-                  type="radio"
-                  class="btn-check"
-                  name="filter_mode"
-                  id="modeFocus"
-                  value="focus"
-                  {%
-                  if
-                  filter_mode=""
-                  ="focus"
-                  %}checked{%
-                  endif
-                  %}
-                  onchange="
+                <input type="radio" class="btn-check" name="filter_mode" id="modeFocus" value="focus" 
+                  {% if filter_mode == "focus" %}checked{% endif %} onchange="
                     toggleFilterMode();
                     this.form.submit();
-                  "
-                />
-                <label class="btn btn-outline-warning" for="modeFocus"
-                  >เจาะจงวันที่ (Focus Date)</label
-                >
+                  " />
+                <label class="btn btn-outline-warning" for="modeFocus">เจาะจงวันที่ (Focus Date)</label>
               </div>
 
               <!-- Mode Content -->
               <div class="mt-2">
                 <!-- General: Movement -->
-                <div
-                  id="generalFilterGroup"
-                  style="display: {% if filter_mode == 'general' %}block{% else %}none{% endif %};"
-                >
-                  <select
-                    name="movement"
-                    class="form-select form-select-sm"
-                    onchange="this.form.submit()"
-                  >
-                    <option
-                      value="all"
-                      {%
-                      if
-                      movement_filter=""
-                      ="all"
-                      %}selected{%
-                      endif
-                      %}
-                    >
+                <div id="generalFilterGroup"
+                  style="display: {% if filter_mode  ==  'general' %}block{% else %}none{% endif %};">
+                  <select name="movement" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="all" {% if movement_filter == "all" %}selected{% endif %}>
                       แสดงสินค้าทั้งหมด
                     </option>
-                    <option
-                      value="active"
-                      {%
-                      if
-                      movement_filter=""
-                      ="active"
-                      %}selected{%
-                      endif
-                      %}
-                    >
+                    <option value="active" {% if movement_filter == "active" %}selected{% endif %}>
                       🟢 เฉพาะที่มีการเคลื่อนไหว
                     </option>
-                    <option
-                      value="inactive"
-                      {%
-                      if
-                      movement_filter=""
-                      ="inactive"
-                      %}selected{%
-                      endif
-                      %}
-                    >
+                    <option value="inactive" {% if movement_filter == "inactive" %}selected{% endif %}>
                       🔴 เฉพาะที่ไม่มีการเคลื่อนไหว
                     </option>
                   </select>
+
+
                 </div>
 
                 <!-- Focus: Date Picker -->
-                <div
-                  id="focusFilterGroup"
-                  style="display: {% if filter_mode == 'focus' %}block{% else %}none{% endif %};"
-                >
+                <div id="focusFilterGroup"
+                  style="display: {% if filter_mode == 'focus' %}block{% else %}none{% endif %};">
                   <div class="input-group input-group-sm">
                     <span class="input-group-text">วันที่สนใจ</span>
-                    <input
-                      type="date"
-                      name="focus_date"
-                      class="form-control"
-                      value="{{ focus_date }}"
-                      onchange="this.form.submit()"
-                    />
+                    <input type="date" name="focus_date" class="form-control" value="{{ focus_date }}"
+                      onchange="this.form.submit()" />
                   </div>
                   <div class="form-text small text-muted mt-1">
                     * แสดงเฉพาะสินค้าที่มียอดขายในวันที่เลือก
@@ -208,14 +133,8 @@
           <div class="col-md-2">
             <label class="form-label fw-bold">🔍 ค้นหา</label>
             <div class="input-group">
-              <input
-                type="text"
-                name="search"
-                class="form-control"
-                value="{{ search_query }}"
-                placeholder="รหัส หรือ ชื่อสินค้า..."
-                onchange="this.form.submit()"
-              />
+              <input type="text" name="search" class="form-control" value="{{ search_query }}"
+                placeholder="รหัส หรือ ชื่อสินค้า..." onchange="this.form.submit()" />
               <button type="submit" class="btn btn-primary">
                 <i class="bi bi-search"></i>
               </button>
@@ -232,16 +151,20 @@
           <table class="table table-hover table-striped align-middle mb-0">
             <thead class="table-dark text-nowrap">
               <tr>
-                <th class="text-center" style="width: 60px">ประวัติ</th>
+                <th class="text-center border-start border-end" style="width: 50px">❤️</th>
+                <th class="text-center border-start border-end" style="width: 60px">ประวัติ</th>
                 <th>รหัสสินค้า</th>
                 <th>รูป</th>
                 <th>ชื่อสินค้า</th>
-                <th class="text-end">คงเหลือ</th>
-                <th class="text-end">ยอดรวม</th>
-                <th class="text-center">สถานะ</th>
+                <th class="text-center border-start border-end">สถานะ</th>
+                <th class="text-end border-start border-end">คงเหลือ</th>
+                <th class="text-end text-warning border-start border-end">รอเข้า</th>
+                <th class="text-end text-success border-start border-end">ขายเฉลี่ย/วัน</th>
+                <th class="text-end text-primary border-start border-end">ยอดรวม ({{ num_days }} วัน)</th>
+
                 <!-- Daily Columns Headers -->
                 {% for d_header in date_headers %}
-                <th class="text-center small" style="min-width: 50px">
+                <th class="text-center small border-start border-end" style="min-width: 50px">
                   {{ d_header }}
                 </th>
                 {% endfor %}
@@ -250,81 +173,99 @@
             <tbody>
               {% for item in products %}
               <tr>
-                <td class="text-center">
-                  <button
-                    class="btn btn-sm btn-outline-info border-0"
-                    onclick="loadSalesHistory('{{ item.product_code|escapejs }}')"
-                  >
+                <!-- 1. Favorites Toggle -->
+                <td class="text-center border-start border-end">
+                  <i class="bi {% if item.is_favourite %}bi-heart-fill text-danger{% else %}bi-heart text-muted{% endif %} fs-5"
+                    style="cursor: pointer;" onclick="toggleFavourite('{{ item.product_code|escapejs }}', this)"></i>
+                </td>
+
+                <!-- 2. History -->
+                <td class="text-center border-start border-end">
+                  <button class="btn btn-sm btn-outline-info border-0"
+                    onclick="loadSalesHistory('{{ item.product_code|escapejs }}')">
                     <i class="bi bi-clock-history fs-5"></i>
                   </button>
                 </td>
-                <td class="fw-bold text-primary">{{ item.product_code }}</td>
-                <td>
+
+                <!-- 3. Code -->
+                <td class="fw-bold text-primary border-start border-end">{{ item.product_code }}</td>
+
+                <!-- 4. Image -->
+                <td class="border-start border-end">
                   {% if item.image %}
-                  <img
-                    src="{{ item.image.url }}"
-                    alt="{{ item.product_code }}"
-                    class="rounded"
-                    style="height: 40px; width: 40px; object-fit: cover"
-                  />
+                  <img src="{{ item.image.url }}" alt="{{ item.product_code }}" class="rounded"
+                    style="height: 40px; width: 40px; object-fit: cover" />
                   {% else %}
                   <span class="text-muted small">No Img</span>
                   {% endif %}
                 </td>
-                <td>
-                  <div
-                    class="text-truncate"
-                    style="max-width: 200px"
-                    title="{{ item.name }}"
-                  >
+
+                <!-- 5. Name -->
+                <td class="border-start border-end">
+                  <div class="text-truncate" style="max-width: 200px" title="{{ item.name }}">
                     {{ item.name }}
                   </div>
                 </td>
-                <td class="text-end text-muted">
-                  {{ item.current_stock|intcomma }}
-                </td>
-                <td class="text-end fw-bold text-success">
-                  {{ item.period_qty|intcomma }}
-                </td>
-                <td class="text-center">
-                  {% if item.current_stock <= 0 %}
+
+                <!-- 6. Status -->
+                <td class="text-center border-start border-end">
+                  {% if item.display_status_code == 'discontinued' %}
+                  <span class="badge bg-secondary rounded-pill">❌ เลิกขาย</span>
+                  {% elif item.display_status_code == 'empty' %}
                   <span class="badge bg-danger rounded-pill">หมด</span>
-                  {% elif item.current_stock <= item.min_limit %}
-                  <span class="badge bg-warning text-dark rounded-pill"
-                    >ใกล้หมด</span
-                  >
+                  {% elif item.display_status_code == 'low' %}
+                  <span class="badge bg-warning text-dark rounded-pill">ใกล้หมด</span>
                   {% else %}
                   <span class="badge bg-success rounded-pill">ปกติ</span>
                   {% endif %}
                 </td>
 
+                <!-- 7. Stock -->
+                <td class="text-end text-muted border-start border-end">
+                  {{ item.current_stock|intcomma }}
+                </td>
+
+                <!-- 8. Incoming -->
+                <td class="text-end text-warning border-start border-end">
+                  {% if item.incoming_qty > 0 %}
+                  +{{ item.incoming_qty|intcomma }}
+                  {% else %}
+                  -
+                  {% endif %}
+                </td>
+
+                <!-- 9. Avg Sales -->
+                <td class="text-end text-success border-start border-end">
+                  {{ item.avg_sales|floatformat:1 }}
+                </td>
+
+                <!-- 10. Total Period -->
+                <td class="text-end fw-bold text-primary border-start border-end">
+                  {{ item.period_qty|intcomma }}
+                </td>
+
                 <!-- Daily Sales Data -->
                 {% for qty in item.daily_sales %}
-                <td
-                  class="text-center small {% if qty > 0 %}fw-bold text-primary{% else %}text-muted{% endif %}"
-                >
-                  {{ qty }}
+                <td class="text-center small border-start border-end {% if qty > 0 %}fw-bold text-primary{% else %}text-muted{% endif %}">
+                  {% if qty > 0 %}{{ qty }}{% else %}-{% endif %}
                 </td>
                 {% endfor %}
               </tr>
               {% empty %}
               <tr>
-                <td
-                  colspan="{{ date_headers|length|add:7 }}"
-                  class="text-center py-4 text-muted"
-                >
+                <td colspan="{{ date_headers|length|add:7 }}" class="text-center py-4 text-muted">
                   ไม่พบข้อมูลสินค้า
                 </td>
               </tr>
               {% endfor %}
             </tbody>
-            <tfoot class="table-light fw-bold">
+            <tfoot class="table-dark fw-bold">
               <tr>
-                <td colspan="5" class="text-end">รวมยอดขายทั้งสิ้น</td>
-                <td class="text-end text-primary">
+                <td colspan="9" class="text-end border-start border-end">รวมยอดขายทั้งสิ้น</td>
+                <td class="text-end text-primary border-start border-end">
                   {{ total_period_sales|floatformat:2|intcomma }} ฿
                 </td>
-                <td colspan="{{ date_headers|length|add:1 }}"></td>
+                <td class="border-start border-end" colspan="{{ date_headers|length }}"></td>
               </tr>
             </tfoot>
           </table>
@@ -335,25 +276,15 @@
 </div>
 
 <!-- History Modal -->
-<div
-  class="modal fade"
-  id="salesHistoryModal"
-  tabindex="-1"
-  aria-labelledby="salesHistoryModalLabel"
-  aria-hidden="true"
->
+<div class="modal fade" id="salesHistoryModal" tabindex="-1" aria-labelledby="salesHistoryModalLabel"
+  aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content bg-dark text-light border-secondary">
       <div class="modal-header border-secondary">
         <h5 class="modal-title" id="salesHistoryModalLabel">
           ประวัติการขาย (Sales History)
         </h5>
-        <button
-          type="button"
-          class="btn-close btn-close-white"
-          data-bs-dismiss="modal"
-          aria-label="Close"
-        ></button>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body p-0">
         <!-- Content loaded via AJAX -->
@@ -405,6 +336,60 @@
     document.getElementById("focusFilterGroup").style.display = isGeneral
       ? "none"
       : "block";
+  }
+
+  function toggleFavourite(sku, iconElement) {
+    // Toggle UI immediately for better UX
+    const isFav = iconElement.classList.contains('bi-heart-fill');
+
+    if (isFav) {
+      iconElement.classList.remove('bi-heart-fill', 'text-danger');
+      iconElement.classList.add('bi-heart', 'text-muted');
+    } else {
+      iconElement.classList.remove('bi-heart', 'text-muted');
+      iconElement.classList.add('bi-heart-fill', 'text-danger');
+    }
+
+    // Send AJAX request
+    const formData = new FormData();
+    formData.append('sku', sku);
+    formData.append('field', 'is_favourite');
+    formData.append('value', !isFav);
+    formData.append('action', 'update_field');
+
+    fetch('/stock/', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': '{{ csrf_token }}',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: formData
+    })
+      .then(response => response.json())
+      .then(data => {
+        if (!data.success) {
+          // Revert if error
+          alert('Error updating favorite: ' + (data.error || 'Unknown error'));
+          if (isFav) {
+            iconElement.classList.add('bi-heart-fill', 'text-danger');
+            iconElement.classList.remove('bi-heart', 'text-muted');
+          } else {
+            iconElement.classList.add('bi-heart', 'text-muted');
+            iconElement.classList.remove('bi-heart-fill', 'text-danger');
+          }
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        // Revert
+        if (isFav) {
+          iconElement.classList.add('bi-heart-fill', 'text-danger');
+          iconElement.classList.remove('bi-heart', 'text-muted');
+        } else {
+          iconElement.classList.add('bi-heart', 'text-muted');
+          iconElement.classList.remove('bi-heart-fill', 'text-danger');
+        }
+      });
   }
 </script>
 {% endblock %}
