@@ -1,0 +1,140 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}ค้นหา PO & สินค้า - JST System{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h2 class="mb-3">🔍 ค้นหา PO & สินค้า</h2>
+
+        <!-- Search Form -->
+        <div class="card p-3 shadow-sm mb-4">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">เลข PO (PO Number)</label>
+                    <input type="text" name="po_number" class="form-control" value="{{ po_number_query }}" placeholder="ระบุเลข PO...">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">ค้นหาสินค้า (SKU / ชื่อ)</label>
+                    <input type="text" name="search" class="form-control" value="{{ search_query }}" placeholder="ระบุรหัสหรือชื่อสินค้า...">
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2 w-100">
+                        <i class="bi bi-search me-2"></i>ค้นหา
+                    </button>
+                    <a href="{% url 'po_search' %}" class="btn btn-outline-secondary w-50">ล้าง</a>
+                </div>
+            </form>
+        </div>
+
+        <!-- Result Table -->
+        <div class="card shadow-sm">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped align-middle mb-0 text-nowrap">
+                        <thead class="table-dark">
+                            <tr>
+                                <th class="border-start border-end">เลข PO</th>
+                                <th class="border-start border-end">รหัสสินค้า + ชื่อสินค้า</th>
+                                <th class="border-start border-end text-center">รูปสินค้า</th>
+                                <th class="border-start border-end text-center">ขนส่ง</th>
+                                <th class="border-start border-end text-center">วันที่สั่งของ</th>
+                                <th class="border-start border-end text-center">วันที่ได้รับ</th>
+                                <th class="border-start border-end text-center">ระยะเวลา</th>
+                                <th class="border-start border-end text-end">จำนวนสั่งซื้อ</th>
+                                <th class="border-start border-end text-end">สต็อกคงเหลือ</th>
+                                <th class="border-start border-end text-end">เรทเงินหยวน</th>
+                                <th class="border-start border-end text-end text-warning">ต้นทุน/ชิ้น (บาท)</th>
+                                <th class="border-start border-end text-end">ราคาหยวนทั้งหมด</th>
+                                <th class="border-start border-end text-end">ราคา/ชิ้น (หยวน)</th>
+                                <th class="border-start border-end text-end text-info">ราคา Shopee</th>
+                                <th class="border-start border-end text-end text-info">ราคา Lazada</th>
+                                <th class="border-start border-end text-end text-info">ราคา Tiktok</th>
+                                <th class="border-start border-end">หมายเหตุ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in items %}
+                            <tr>
+                                <td class="border-start border-end fw-bold text-primary">
+                                    <a href="{% url 'po_detail' item.header.id %}">{{ item.header.po_number }}</a>
+                                </td>
+                                <td class="border-start border-end">
+                                    <div class="fw-bold">{{ item.sku.product_code }}</div>
+                                    <div class="small text-muted text-truncate" style="max-width: 200px;" title="{{ item.sku.name }}">
+                                        {{ item.sku.name }}
+                                    </div>
+                                </td>
+                                <td class="border-start border-end text-center">
+                                    {% if item.sku.image %}
+                                        <img src="{{ item.sku.image.url }}" alt="{{ item.sku.product_code }}" class="rounded" style="height: 40px; width: 40px; object-fit: cover">
+                                    {% else %}
+                                        <span class="text-muted small">No Img</span>
+                                    {% endif %}
+                                </td>
+                                <td class="border-start border-end text-center">
+                                    {% if item.header.shipping_type == 'CAR' %}
+                                        <span class="badge bg-info text-dark">🚗 รถ</span>
+                                    {% elif item.header.shipping_type == 'SHIP' %}
+                                        <span class="badge bg-primary">🚢 เรือ</span>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td class="border-start border-end text-center">{{ item.header.order_date|date:"d/m/Y" }}</td>
+                                <td class="border-start border-end text-center">
+                                    {% if item.latest_received_date %}
+                                        {{ item.latest_received_date|date:"d/m/Y" }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="border-start border-end text-center">
+                                    {% if item.duration != None %}
+                                        <span class="badge bg-secondary">{{ item.duration }} วัน</span>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td class="border-start border-end text-end">{{ item.qty_ordered|intcomma }}</td>
+                                <td class="border-start border-end text-end fw-bold {% if item.sku.current_stock <= 0 %}text-danger{% elif item.sku.current_stock <= item.sku.min_limit %}text-warning{% endif %}">
+                                    {{ item.sku.current_stock|intcomma }}
+                                </td>
+                                <td class="border-start border-end text-end">{{ item.header.exchange_rate }}</td>
+                                <td class="border-start border-end text-end fw-bold text-warning">
+                                    {{ item.unit_cost_thb|floatformat:2|intcomma }} ฿
+                                </td>
+                                <td class="border-start border-end text-end">{{ item.price_yuan|floatformat:2|intcomma }} ¥</td>
+                                <td class="border-start border-end text-end">{{ item.unit_price_yuan|floatformat:2|intcomma }} ¥</td>
+                                <td class="border-start border-end text-end text-info">
+                                    {% if item.sku.shopee_price %}{{ item.sku.shopee_price|intcomma }}{% else %}-{% endif %}
+                                </td>
+                                <td class="border-start border-end text-end text-info">
+                                    {% if item.sku.lazada_price %}{{ item.sku.lazada_price|intcomma }}{% else %}-{% endif %}
+                                </td>
+                                <td class="border-start border-end text-end text-info">
+                                    {% if item.sku.tiktok_price %}{{ item.sku.tiktok_price|intcomma }}{% else %}-{% endif %}
+                                </td>
+                                <td class="border-start border-end small">
+                                    <div class="text-truncate" style="max-width: 150px;" title="{{ item.header.note }}">
+                                        {{ item.header.note|default_if_none:"-" }}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="17" class="text-center py-5 text-muted">
+                                    <i class="bi bi-inbox fs-1 d-block mb-3"></i>
+                                    ไม่พบข้อมูลที่ค้นหา หรือ กรุณาระบุเงื่อนไขการค้นหา
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,258 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}ข้อมูลร้านค้า (Supplier Info) - JST System{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2>👥 สรุปข้อมูลร้านค้า/ลูกค้า (Supplier Info)</h2>
+            <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#supplierModal">
+                <i class="bi bi-plus-circle me-2"></i>บันทึกข้อมูลร้านค้าใหม่
+            </button>
+        </div>
+
+        <!-- Search Section -->
+        <div class="card p-3 shadow-sm mb-4 bg-dark border-secondary">
+            <form method="get" class="row g-3">
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <span class="input-group-text bg-transparent border-secondary text-warning">
+                            <i class="bi bi-box-seam me-2"></i> ค้นหารหัส / ชื่อสินค้า
+                        </span>
+                        <input type="text" name="search_sku" class="form-control bg-transparent border-secondary text-white" 
+                               value="{{ search_sku }}" placeholder="ค้นหา รหัสสินค้า หรือ ชื่อสินค้า...">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <span class="input-group-text bg-transparent border-secondary text-info">
+                            <i class="bi bi-shop me-2"></i> ค้นหาชื่อร้านค้า / วีแชท
+                        </span>
+                        <input type="text" name="search_store" class="form-control bg-transparent border-secondary text-white" 
+                               value="{{ search_store }}" placeholder="ค้นหา ชื่อร้านค้า หรือ ไอดีวีแชท...">
+                        <button type="submit" class="btn btn-primary px-4">
+                            <i class="bi bi-search"></i>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Summary Table -->
+        <div class="card shadow-sm border-secondary overflow-hidden">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped align-middle mb-0 text-nowrap text-center">
+                        <thead class="bg-primary text-white">
+                            <tr>
+                                <th class="border-secondary py-3">ปุ่ม แก้ไข / ลบ</th>
+                                <th class="border-secondary">รหัสสินค้า + ชื่อสินค้า</th>
+                                <th class="border-secondary">รูปสินค้า</th>
+                                <th class="border-secondary">ชื่อร้านค้า</th>
+                                <th class="border-secondary">ลิงก์ร้านค้า</th>
+                                <th class="border-secondary">ลิงก์สินค้า</th>
+                                <th class="border-secondary">WECHAT</th>
+                                <th class="border-secondary">ช่องทางสั่งซื้อ</th>
+                                <th class="border-secondary">QR CODE</th>
+                                <th class="border-secondary">อื่นๆ</th>
+                                <th class="border-secondary">หมายเหตุ</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-dark text-light">
+                            {% for s in suppliers %}
+                            <tr>
+                                <td class="border-secondary">
+                                    <button class="btn btn-sm btn-outline-warning me-1" onclick="editSupplier({{ s.id }}, '{{ s.sku.product_code|default:'' }}', '{{ s.product_name_manual|default:''|escapejs }}', '{{ s.store_name|escapejs }}', '{{ s.store_link|default:''|escapejs }}', '{{ s.product_link|default:''|escapejs }}', '{{ s.wechat_id|default:''|escapejs }}', '{{ s.order_channel|default:''|escapejs }}', '{{ s.note|default:''|escapejs }}')">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <form action="{% url 'delete_supplier_info' s.id %}" method="post" class="d-inline" onsubmit="return confirm('ยืนยันการลบข้อมูลร้านค้า?')">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                                <td class="border-secondary fw-bold text-start">{{ s.display_product_name }}</td>
+                                <td class="border-secondary">
+                                    {% if s.product_image %}
+                                        <img src="{{ s.product_image.url }}" class="rounded shadow-sm" style="height: 40px; width: 40px; object-fit: cover; cursor: pointer;" onclick="window.open('{{ s.product_image.url }}')">
+                                    {% else %}
+                                        <span class="text-muted small">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="border-secondary">{{ s.store_name }}</td>
+                                <td class="border-secondary">
+                                    {% if s.store_link %}
+                                        <button class="btn btn-sm btn-outline-light" onclick="copyToClipboard('{{ s.store_link|escapejs }}')">
+                                            <i class="bi bi-link-45deg"></i> Link ร้าน
+                                        </button>
+                                    {% else %}-{% endif %}
+                                </td>
+                                <td class="border-secondary">
+                                    {% if s.product_link %}
+                                        <button class="btn btn-sm btn-outline-light" onclick="copyToClipboard('{{ s.product_link|escapejs }}')">
+                                            <i class="bi bi-link-45deg"></i> Link สินค้า
+                                        </button>
+                                    {% else %}-{% endif %}
+                                </td>
+                                <td class="border-secondary">{{ s.wechat_id|default:"-" }}</td>
+                                <td class="border-secondary">{{ s.order_channel|default:"-" }}</td>
+                                <td class="border-secondary">
+                                    {% if s.qr_code %}
+                                        <img src="{{ s.qr_code.url }}" class="rounded shadow-sm" style="height: 40px; width: 40px; object-fit: cover; cursor: pointer;" onclick="viewImage('{{ s.qr_code.url }}')">
+                                    {% else %}-{% endif %}
+                                </td>
+                                <td class="border-secondary">
+                                    {% if s.other_image %}
+                                        <img src="{{ s.other_image.url }}" class="rounded shadow-sm" style="height: 40px; width: 40px; object-fit: cover; cursor: pointer;" onclick="viewImage('{{ s.other_image.url }}')">
+                                    {% else %}-{% endif %}
+                                </td>
+                                <td class="border-secondary">
+                                    <div class="text-truncate" style="max-width: 150px;" title="{{ s.note }}">
+                                        {{ s.note|default:"-" }}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="11" class="text-center py-5 text-muted">ไม่พบข้อมูลร้านค้า</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal For Adding/Editing -->
+<div class="modal fade" id="supplierModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark text-light border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title" id="modalTitle">📝 บันทึกข้อมูลร้านค้าใหม่</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{% url 'save_supplier_info' %}" method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="supplier_id" id="form_supplier_id">
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">รหัสสินค้า (ในระบบ)</label>
+                            <select name="sku_code" class="form-select bg-dark text-light border-secondary">
+                                <option value="">-- ไม่ระบุ (กรอกเองด้านล่าง) --</option>
+                                {% for item in master_items %}
+                                <option value="{{ item.product_code }}">{{ item.product_code }} : {{ item.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">รหัสสินค้า + ชื่อสินค้า (พิมพ์เอง)</label>
+                            <input type="text" name="product_name_manual" id="form_product_name_manual" class="form-control bg-dark text-light border-secondary">
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">ชื่อร้านค้า (ภาษาจีน/ไทย)</label>
+                            <input type="text" name="store_name" id="form_store_name" class="form-control bg-dark text-light border-secondary" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">ไอดีวีแชท (WECHAT)</label>
+                            <input type="text" name="wechat_id" id="form_wechat_id" class="form-control bg-dark text-light border-secondary">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">ลิงก์ร้านค้า (URL)</label>
+                            <input type="url" name="store_link" id="form_store_link" class="form-control bg-dark text-light border-secondary">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">ลิงก์สินค้า (URL)</label>
+                            <input type="url" name="product_link" id="form_product_link" class="form-control bg-dark text-light border-secondary">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">ช่องทางสั่งซื้อ</label>
+                            <input type="text" name="order_channel" id="form_order_channel" class="form-control bg-dark text-light border-secondary" placeholder="เช่น สั่งทาง 1688, คุยผ่านวีแชท โอนเงิน">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">หมายเหตุ</label>
+                            <input type="text" name="note" id="form_note" class="form-control bg-dark text-light border-secondary" placeholder="ระบุหมายเหตุ...">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">อัปโหลดรูปสินค้า (JPG, PNG)</label>
+                            <input type="file" name="product_image" class="form-control bg-dark text-light border-secondary">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">อัปโหลด QR CODE (JPG, PNG)</label>
+                            <input type="file" name="qr_code" class="form-control bg-dark text-light border-secondary">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">อัปโหลดรูปอื่นๆ (JPG, PNG)</label>
+                            <input type="file" name="other_image" class="form-control bg-dark text-light border-secondary">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="submit" class="btn btn-danger w-100 py-2">
+                        <i class="bi bi-save me-2"></i>บันทึกข้อมูลลงระบบ
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Image View Modal -->
+<div class="modal fade" id="imageModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-transparent border-0">
+            <div class="modal-body p-0 text-center">
+                <img src="" id="fullImage" class="img-fluid rounded shadow-lg">
+                <button type="button" class="btn btn-light mt-3" data-bs-dismiss="modal">ปิด</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            alert("คัดลอกลิงก์แล้ว!");
+        });
+    }
+
+    function viewImage(src) {
+        document.getElementById('fullImage').src = src;
+        new bootstrap.Modal(document.getElementById('imageModal')).show();
+    }
+
+    function editSupplier(id, sku, manual, store, sLink, pLink, wechat, channel, note) {
+        document.getElementById('form_supplier_id').value = id;
+        document.getElementById('modalTitle').textContent = "✏️ แก้ไขข้อมูลร้านค้า";
+        
+        const select = document.querySelector('select[name="sku_code"]');
+        select.value = sku;
+        
+        document.getElementById('form_product_name_manual').value = manual;
+        document.getElementById('form_store_name').value = store;
+        document.getElementById('form_store_link').value = sLink;
+        document.getElementById('form_product_link').value = pLink;
+        document.getElementById('form_wechat_id').value = wechat;
+        document.getElementById('form_order_channel').value = channel;
+        document.getElementById('form_note').value = note;
+        
+        new bootstrap.Modal(document.getElementById('supplierModal')).show();
+    }
+    
+    // Reset modal on close
+    document.getElementById('supplierModal').addEventListener('hidden.bs.modal', function () {
+        document.getElementById('form_supplier_id').value = "";
+        document.getElementById('modalTitle').textContent = "📝 บันทึกข้อมูลร้านค้าใหม่";
+        document.querySelector('form[action="{% url "save_supplier_info" %}"]').reset();
+    });
+</script>
+{% endblock %}

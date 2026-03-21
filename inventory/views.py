@@ -1563,3 +1563,121 @@ def get_sales_history(request, sku):
     }
     
     return render(request, 'inventory/partials/sales_history_table.html', context)
+
+@login_required
+def po_search_view(request):
+    po_number_query = request.GET.get('po_number', '').strip()
+    search_query = request.GET.get('search', '').strip()
+    
+    # Start with all PO items
+    items = POItem.objects.all().select_related('header', 'sku').prefetch_related('receipts').order_by('-header__order_date')
+    
+    # Filter by PO Number
+    if po_number_query:
+        items = items.filter(header__po_number__icontains=po_number_query)
+        
+    # Filter by Product SKU/Name
+    if search_query:
+        items = items.filter(Q(sku__product_code__icontains=search_query) | Q(sku__name__icontains=search_query))
+
+    # For each item, we need to calculate/fetch extra info for the requested columns
+    for item in items:
+        # Latest Receipt Date
+        latest_receipt = item.receipts.order_by('-received_date').first()
+        item.latest_received_date = latest_receipt.received_date if latest_receipt else None
+        
+        # Duration
+        if item.latest_received_date and item.header.order_date:
+            item.duration = (item.latest_received_date - item.header.order_date).days
+        else:
+            item.duration = None
+
+    context = {
+        'items': items,
+        'po_number_query': po_number_query,
+        'search_query': search_query,
+    }
+    return render(request, 'inventory/po_search.html', context)
+
+@login_required
+def supplier_info_view(request):
+    from .models import SupplierInfo
+    search_sku = request.GET.get('search_sku', '').strip()
+    search_store = request.GET.get('search_store', '').strip()
+    
+    suppliers = SupplierInfo.objects.all().select_related('sku').order_by('-created_at')
+    
+    if search_sku:
+        suppliers = suppliers.filter(Q(sku__product_code__icontains=search_sku) | Q(sku__name__icontains=search_sku) | Q(product_name_manual__icontains=search_sku))
+    
+    if search_store:
+        suppliers = suppliers.filter(Q(store_name__icontains=search_store) | Q(wechat_id__icontains=search_store))
+        
+    master_items = MasterItem.objects.all().order_by('product_code')
+    
+    context = {
+        'suppliers': suppliers,
+        'search_sku': search_sku,
+        'search_store': search_store,
+        'master_items': master_items,
+    }
+    return render(request, 'inventory/supplier_info.html', context)
+
+@login_required
+def save_supplier_info(request):
+    from .models import SupplierInfo
+    if request.method == 'POST':
+        supplier_id = request.POST.get('supplier_id')
+        sku_code = request.POST.get('sku_code')
+        product_name_manual = request.POST.get('product_name_manual')
+        store_name = request.POST.get('store_name')
+        store_link = request.POST.get('store_link')
+        product_link = request.POST.get('product_link')
+        wechat_id = request.POST.get('wechat_id')
+        order_channel = request.POST.get('order_channel')
+        note = request.POST.get('note')
+        
+        try:
+            if supplier_id:
+                supplier = get_object_or_404(SupplierInfo, id=supplier_id)
+            else:
+                supplier = SupplierInfo()
+            
+            if sku_code:
+                supplier.sku = MasterItem.objects.get(product_code=sku_code)
+            else:
+                supplier.sku = None
+                
+            supplier.product_name_manual = product_name_manual
+            supplier.store_name = store_name
+            supplier.store_link = store_link
+            supplier.product_link = product_link
+            supplier.wechat_id = wechat_id
+            supplier.order_channel = order_channel
+            supplier.note = note
+            
+            if 'product_image' in request.FILES:
+                supplier.product_image = request.FILES['product_image']
+            if 'qr_code' in request.FILES:
+                supplier.qr_code = request.FILES['qr_code']
+            if 'other_image' in request.FILES:
+                supplier.other_image = request.FILES['other_image']
+                
+            supplier.save()
+            messages.success(request, "✅ บันทึกข้อมูลร้านค้าเรียบร้อย")
+        except Exception as e:
+            messages.error(request, f"❌ Error: {e}")
+            
+    return redirect('supplier_info')
+
+@login_required
+def delete_supplier_info(request, supplier_id):
+    from .models import SupplierInfo
+    if request.method == 'POST':
+        supplier = get_object_or_404(SupplierInfo, id=supplier_id)
+        supplier.delete()
+        messages.success(request, "✅ ลบข้อมูลร้านค้าเรียบร้อย")
+    return redirect('supplier_info')
+
+
+

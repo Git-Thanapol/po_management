@@ -388,6 +388,34 @@ class ImportLog(models.Model):
     def __str__(self):
         return f"{self.import_type} - {self.started_at.strftime('%Y-%m-%d %H:%M')}"
 
+class SupplierInfo(models.Model):
+    sku = models.ForeignKey(MasterItem, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="สินค้าในระบบ")
+    product_name_manual = models.CharField(max_length=255, blank=True, null=True, verbose_name="รหัส/ชื่อสินค้า (กรอกเอง)")
+    
+    store_name = models.CharField(max_length=255, verbose_name="ชื่อร้านค้า")
+    store_link = models.URLField(max_length=1000, blank=True, null=True, verbose_name="ลิงก์ร้านค้า")
+    product_link = models.URLField(max_length=1000, blank=True, null=True, verbose_name="ลิงก์สินค้า")
+    wechat_id = models.CharField(max_length=100, blank=True, null=True, verbose_name="WECHAT")
+    order_channel = models.CharField(max_length=255, blank=True, null=True, verbose_name="ช่องทางสั่งซื้อ")
+    
+    product_image = models.ImageField(upload_to='suppliers/products/', blank=True, null=True, verbose_name="รูปสินค้า")
+    qr_code = models.ImageField(upload_to='suppliers/qr/', blank=True, null=True, verbose_name="QR CODE")
+    other_image = models.ImageField(upload_to='suppliers/others/', blank=True, null=True, verbose_name="รูปอื่นๆ")
+    
+    note = models.TextField(blank=True, null=True, verbose_name="หมายเหตุ")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.store_name} - {self.sku.product_code if self.sku else self.product_name_manual}"
+
+    @property
+    def display_product_name(self):
+        if self.sku:
+            return f"{self.sku.product_code} : {self.sku.name}"
+        return self.product_name_manual or "N/A"
+
+
 # Signals to ensure Proration happens when Items are changed
 @receiver(post_save, sender=POItem)
 def update_header_proration_on_save(sender, instance, created, **kwargs):
