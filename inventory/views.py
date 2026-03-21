@@ -1568,7 +1568,27 @@ def get_sales_history(request, sku):
 def po_search_view(request):
     po_number_query = request.GET.get('po_number', '').strip()
     search_query = request.GET.get('search', '').strip()
+    selected_ids_str = request.GET.get('selected_ids', '').strip()
     
+    selected_ids = [int(x) for x in selected_ids_str.split(',') if x.isdigit()]
+    
+    # 1. Fetch Selected Items (Preserve Order of selection)
+    selected_items = []
+    if selected_ids:
+        # To maintain order, we can't just use __in
+        preserved_order = {id: pos for pos, id in enumerate(selected_ids)}
+        items_objs = POItem.objects.filter(id__in=selected_ids).select_related('header', 'sku').prefetch_related('receipts')
+        selected_items = sorted(items_objs, key=lambda x: preserved_order.get(x.id, 999))
+        
+        for item in selected_items:
+            latest_receipt = item.receipts.order_by('-received_date').first()
+            item.latest_received_date = latest_receipt.received_date if latest_receipt else None
+            if item.latest_received_date and item.header.order_date:
+                item.duration = (item.latest_received_date - item.header.order_date).days
+            else:
+                item.duration = None
+
+    # 2. Main Search Results
     # Start with all PO items
     items = POItem.objects.all().select_related('header', 'sku').prefetch_related('receipts').order_by('-header__order_date')
     
@@ -1580,7 +1600,16 @@ def po_search_view(request):
     if search_query:
         items = items.filter(Q(sku__product_code__icontains=search_query) | Q(sku__name__icontains=search_query))
 
-    # For each item, we need to calculate/fetch extra info for the requested columns
+    # Exclude already selected items from the bottom table if they match the search
+    # This keeps things clean.
+    if selected_ids:
+        items = items.exclude(id__in=selected_ids)
+
+    # For each item, we need to calculate/fetch extra info
+    # Limit to e.g. 50 items if no specific search to avoid performance issues
+    if not po_number_query and not search_query:
+        items = items[:50]
+
     for item in items:
         # Latest Receipt Date
         latest_receipt = item.receipts.order_by('-received_date').first()
@@ -1594,10 +1623,44 @@ def po_search_view(request):
 
     context = {
         'items': items,
+        'selected_items': selected_items,
         'po_number_query': po_number_query,
         'search_query': search_query,
+        'selected_ids_str': selected_ids_str,
     }
     return render(request, 'inventory/po_search.html', context)
+
+@login_required
+def get_search_options(request):
+    """
+    AJAX view to provide cascading options for PO and SKU.
+    """
+    po_number = request.GET.get('po_number', '').strip()
+    sku_query = request.GET.get('sku_query', '').strip()
+    
+    items = POItem.objects.all()
+    
+    if po_number:
+        items = items.filter(header__po_number__icontains=po_number)
+    
+    if sku_query:
+        items = items.filter(Q(sku__product_code__icontains=sku_query) | Q(sku__name__icontains=sku_query))
+        
+    # Limit results
+    items = items.select_related('header', 'sku')[:100]
+    
+    # Extract unique PO numbers and SKUs for suggestions
+    pos = list(items.values_list('header__po_number', flat=True).distinct())
+    skus = []
+    for item in items:
+        val = f"{item.sku.product_code} | {item.sku.name}"
+        if val not in skus:
+            skus.append(val)
+            
+    return JsonResponse({
+        'pos': pos,
+        'skus': skus[:50], # Limit SKU list
+    })
 
 @login_required
 def supplier_info_view(request):

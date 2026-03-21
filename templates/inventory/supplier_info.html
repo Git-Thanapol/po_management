@@ -76,8 +76,10 @@
                                 </td>
                                 <td class="border-secondary fw-bold text-start">{{ s.display_product_name }}</td>
                                 <td class="border-secondary">
-                                    {% if s.product_image %}
-                                        <img src="{{ s.product_image.url }}" class="rounded shadow-sm" style="height: 40px; width: 40px; object-fit: cover; cursor: pointer;" onclick="window.open('{{ s.product_image.url }}')">
+                                    {% if s.sku and s.sku.image %}
+                                        <img src="{{ s.sku.image.url }}" class="rounded shadow-sm" style="height: 40px; width: 40px; object-fit: cover; cursor: pointer;" onclick="viewImage('{{ s.sku.image.url }}')" title="รูปจากฐานข้อมูลสินค้า">
+                                    {% elif s.product_image %}
+                                        <img src="{{ s.product_image.url }}" class="rounded shadow-sm" style="height: 40px; width: 40px; object-fit: cover; cursor: pointer;" onclick="viewImage('{{ s.product_image.url }}')" title="รูปที่อัปโหลดแยก">
                                     {% else %}
                                         <span class="text-muted small">-</span>
                                     {% endif %}
@@ -85,16 +87,26 @@
                                 <td class="border-secondary">{{ s.store_name }}</td>
                                 <td class="border-secondary">
                                     {% if s.store_link %}
-                                        <button class="btn btn-sm btn-outline-light" onclick="copyToClipboard('{{ s.store_link|escapejs }}')">
-                                            <i class="bi bi-link-45deg"></i> Link ร้าน
-                                        </button>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{{ s.store_link }}" target="_blank" class="btn btn-outline-info" title="เปิดลิงก์ร้าน">
+                                                <i class="bi bi-box-arrow-up-right"></i>
+                                            </a>
+                                            <button class="btn btn-outline-light copy-btn" data-url="{{ s.store_link }}" onclick="copyToClipboard(this)" title="คัดลอกลิงก์">
+                                                <i class="bi bi-clipboard"></i>
+                                            </button>
+                                        </div>
                                     {% else %}-{% endif %}
                                 </td>
                                 <td class="border-secondary">
                                     {% if s.product_link %}
-                                        <button class="btn btn-sm btn-outline-light" onclick="copyToClipboard('{{ s.product_link|escapejs }}')">
-                                            <i class="bi bi-link-45deg"></i> Link สินค้า
-                                        </button>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{{ s.product_link }}" target="_blank" class="btn btn-outline-info" title="เปิดลิงก์สินค้า">
+                                                <i class="bi bi-box-arrow-up-right"></i>
+                                            </a>
+                                            <button class="btn btn-outline-light copy-btn" data-url="{{ s.product_link }}" onclick="copyToClipboard(this)" title="คัดลอกลิงก์">
+                                                <i class="bi bi-clipboard"></i>
+                                            </button>
+                                        </div>
                                     {% else %}-{% endif %}
                                 </td>
                                 <td class="border-secondary">{{ s.wechat_id|default:"-" }}</td>
@@ -183,7 +195,7 @@
                         </div>
 
                         <div class="col-md-4">
-                            <label class="form-label">อัปโหลดรูปสินค้า (JPG, PNG)</label>
+                            <label class="form-label">อัปโหลดรูปสินค้า (กรณีไม่มีในระบบ)</label>
                             <input type="file" name="product_image" class="form-control bg-dark text-light border-secondary">
                         </div>
                         <div class="col-md-4">
@@ -208,21 +220,49 @@
 
 <!-- Image View Modal -->
 <div class="modal fade" id="imageModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content bg-transparent border-0">
-            <div class="modal-body p-0 text-center">
+            <div class="modal-body p-0 text-center position-relative">
+                <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-3" data-bs-dismiss="modal" aria-label="Close"></button>
                 <img src="" id="fullImage" class="img-fluid rounded shadow-lg">
-                <button type="button" class="btn btn-light mt-3" data-bs-dismiss="modal">ปิด</button>
+                <div class="mt-3">
+                     <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">ปิด</button>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    function copyToClipboard(text) {
-        navigator.clipboard.writeText(text).then(() => {
-            alert("คัดลอกลิงก์แล้ว!");
-        });
+    function copyToClipboard(btn) {
+        const text = btn.getAttribute('data-url');
+        const originalHtml = btn.innerHTML;
+        
+        // Use textarea fallback for production/Ubuntu/Insecure contexts
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        
+        try {
+            const successful = document.execCommand('copy');
+            if (successful) {
+                btn.innerHTML = '<i class="bi bi-check-lg"></i>';
+                btn.classList.remove('btn-outline-light');
+                btn.classList.add('btn-success');
+                setTimeout(() => {
+                    btn.innerHTML = originalHtml;
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-outline-light');
+                }, 2000);
+            } else {
+                window.prompt("ไม่สามารถคัดลอกอัตโนมัติได้ กรุณากด Ctrl+C:", text);
+            }
+        } catch (err) {
+            window.prompt("ไม่สามารถคัดลอกอัตโนมัติได้ กรุณากด Ctrl+C:", text);
+        }
+        
+        document.body.removeChild(textArea);
     }
 
     function viewImage(src) {
