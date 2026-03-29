@@ -68,10 +68,6 @@
           class="list-group-item list-group-item-action bg-transparent text-white border-0 py-3 {% if request.resolver_match.url_name == 'po_list' %}active fw-bold text-success{% endif %}">
           <i class="bi bi-cart3 me-2"></i> รายการสั่งซื้อ (PO)
         </a>
-        <a href="{% url 'po_search' %}"
-          class="list-group-item list-group-item-action bg-transparent text-white border-0 py-3 {% if request.resolver_match.url_name == 'po_search' %}active fw-bold text-info{% endif %}">
-          <i class="bi bi-search me-2"></i> ค้นหา PO & สินค้า
-        </a>
         <a href="{% url 'supplier_info' %}"
           class="list-group-item list-group-item-action bg-transparent text-white border-0 py-3 {% if request.resolver_match.url_name == 'supplier_info' %}active fw-bold text-info{% endif %}">
           <i class="bi bi-people me-2"></i> ข้อมูลร้านค้า (Suppliers)

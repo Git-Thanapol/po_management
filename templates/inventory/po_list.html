@@ -34,7 +34,8 @@
 
     <div class="card shadow-sm mb-4 border-0" style="background-color: #1e293b;">
       <div class="card-body p-3">
-        <form method="get" class="row g-2 align-items-end">
+        <form method="get" id="searchForm" class="row g-2 align-items-end">
+          <input type="hidden" name="selected_ids" id="selected_ids" value="{{ selected_ids_str }}">
 
           <div class="col-md-3">
             <label class="form-label text-success small fw-bold mb-1"><i class="bi bi-calendar-plus"></i>
@@ -62,13 +63,15 @@
 
           <div class="col-md-2">
             <label class="form-label text-muted small mb-1">เลข PO</label>
-            <input type="text" name="po_number" class="form-control form-control-sm bg-dark text-white border-secondary"
-              value="{{ po_number_query }}" placeholder="ระบุเลข PO...">
+            <input type="text" name="po_number" id="po_number_input" list="po_list" class="form-control form-control-sm bg-dark text-white border-secondary"
+              value="{{ po_number_query }}" placeholder="ระบุเลข PO..." autocomplete="off">
+            <datalist id="po_list"></datalist>
           </div>
           <div class="col-md-2">
             <label class="form-label text-muted small mb-1">SKU / สินค้า</label>
-            <input type="text" name="search" class="form-control form-control-sm bg-dark text-white border-secondary"
-              value="{{ search_query }}" placeholder="ค้นหา...">
+            <input type="text" name="search" id="search_input" list="sku_list" class="form-control form-control-sm bg-dark text-white border-secondary"
+              value="{{ search_query }}" placeholder="ค้นหา..." autocomplete="off">
+            <datalist id="sku_list"></datalist>
           </div>
 
           <div class="col-md-1">
@@ -76,6 +79,7 @@
               <div class="col-12">
                 <select name="status" class="form-select form-select-sm bg-dark text-white border-secondary mb-1">
                   <option value="">สถานะ: ทั้งหมด</option>
+                  <option value="not_arrived" {% if status_filter == "not_arrived" %}selected{% endif %}>⚠️ ที่ยังไม่ถึงทั้งหมด</option>
                   <option value="Pending" {% if status_filter == "Pending" %}selected{% endif %}>รอจัดส่ง</option>
                   <option value="Arriving Soon" {% if status_filter == "Arriving Soon" %}selected{% endif %}>ใกล้ถึง
                   </option>
@@ -91,10 +95,17 @@
             </div>
           </div>
 
+          <div class="col-md-auto">
+             <button type="button" class="btn btn-sm btn-warning fw-bold text-dark shadow-sm h-100" onclick="setFastFilter('not_arrived')">
+                <i class="bi bi-lightning-fill"></i> ที่ยังไม่ถึงทั้งหมด
+             </button>
+          </div>
+
         </form>
       </div>
     </div>
 
+    <!-- Summary Metrics -->
     <div class="row g-3 mb-4">
       <div class="col-md-3">
         <div class="card h-100 border-0 shadow-sm"
@@ -179,160 +190,254 @@
       </div>
     </div>
 
-    <!-- Table -->
+    <!-- Selected Items Table (Top Table) -->
+    {% if selected_items %}
+    <div class="card shadow-sm mb-4 border-0" style="background-color: #1e293b;">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-2">
+            <h5 class="mb-0 fs-6 fw-bold"><i class="bi bi-check-circle-fill me-2"></i>รายการที่เลือกไว้เพื่อเปรียบเทียบ ({{ selected_items|length }} รายการ)</h5>
+            <button type="button" onclick="clearSelected()" class="btn btn-xs btn-outline-light py-0 fw-bold" style="font-size: 0.75rem;">ล้างทั้งหมด</button>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-striped align-middle mb-0" style="font-size: 0.85rem">
+                    <thead class="text-nowrap text-center text-white">
+                        <tr>
+                            <th class="bg-danger">จัดการ</th>
+                            <th class="bg-primary">รหัสสินค้า</th>
+                            <th class="bg-dark">รูป</th>
+                            <th class="bg-dark">สถานะ</th>
+                            <th class="bg-dark">เลข PO</th>
+                            <th class="bg-dark">ขนส่ง</th>
+                            <th style="background-color: #6f42c1">วันที่สั่งซื้อ</th>
+                            <th style="background-color: #6f42c1">วันคาดการณ์</th>
+                            <th style="background-color: #6f42c1">วันที่บิลเรียกเก็บ</th>
+                            <th style="background-color: #6f42c1">วันที่ได้รับสินค้า</th>
+                            <th style="background-color: #6f42c1">ระยะเวลา</th>
+                            <th style="background-color: #6f42c1">จำนวนรับ</th>
+                            <th style="background-color: #6f42c1">รับเข้าแล้ว</th>
+                            <th style="background-color: #198754">สั่งซื้อ</th>
+                            <th class="bg-danger">สต็อกคงเหลือ</th>
+                            <th class="bg-warning text-dark">รอเข้า</th>
+                            <th style="background-color: #198754">ต้นทุน/ชิ้น (฿)</th>
+                            <th class="bg-dark">ยอดหยวน (¥)</th>
+                            <th class="bg-dark">ยอดบาทรวม (฿)</th>
+                            <th class="bg-dark">เรทเงิน</th>
+                            <th class="bg-dark">เรทขนส่ง</th>
+                            <th class="bg-dark">คิว (CBM)</th>
+                            <th class="bg-dark">ค่าส่งรวม</th>
+                            <th class="bg-dark">น้ำหนัก (KG)</th>
+                            <th class="bg-dark">ราคา/ชิ้น (¥)</th>
+                            <th style="background-color: #fd7e14">SHOPEE</th>
+                            <th style="background-color: #0d6efd">LAZADA</th>
+                            <th class="bg-black">TIKTOK</th>
+                            <th class="bg-dark">หมายเหตุ</th>
+                            <th class="bg-dark">เอกสารแนบ</th>
+                            <th class="bg-dark">ร้านค้า</th>
+                            <th class="bg-dark">ติดต่อ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in selected_items %}
+                        <tr>
+                            <td class="text-center">
+                                <button type="button" class="btn btn-sm btn-outline-danger border-0 p-0" onclick="removeItem({{ item.id }})" title="Remove">
+                                    <i class="bi bi-x-circle-fill"></i>
+                                </button>
+                            </td>
+                            <td class="fw-bold text-primary">{{ item.sku.product_code }}</td>
+                            <td class="text-center">
+                                {% if item.sku.image %}
+                                    <img src="{{ item.sku.image.url }}" class="rounded" style="height: 35px; width: 35px; object-fit: cover" />
+                                {% else %}
+                                    <span class="text-muted small">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if item.header.status == 'Pending' %}
+                                <span class="badge rounded-pill bg-primary text-dark">รอจัดส่ง</span>
+                                {% elif item.header.status == 'Complete' %}
+                                <span class="badge rounded-pill bg-success">เรียบร้อย</span>
+                                {% elif item.header.status == 'Arriving Soon' %}
+                                <span class="badge rounded-pill bg-warning">ใกล้ถึง</span>
+                                {% elif item.header.status == 'Overdue' %}
+                                <span class="badge rounded-pill bg-danger">เลยกำหนด</span>
+                                {% elif item.header.status == 'Incomplete' %}
+                                <span class="badge rounded-pill bg-secondary">ไม่ครบ</span>
+                                {% else %}
+                                <span class="badge rounded-pill bg-secondary">ผิดปกติ</span>
+                                {% endif %}
+                            </td>
+                            <td><a href="{% url 'po_detail' item.header.id %}" class="text-info text-decoration-none">{{ item.header.po_number }}</a></td>
+                            <td class="text-center">{{ item.header.get_shipping_type_display|default:"-" }}</td>
+                            <td class="text-nowrap">{{ item.header.order_date|date:"d/m/Y" }}</td>
+                            <td class="text-nowrap">{{ item.header.estimated_date|date:"d/m/Y"|default:"-" }}</td>
+                            <td class="text-nowrap text-center text-secondary p-0 align-top">
+                                {% for r in item.receipts.all %}
+                                    <div class="border-bottom border-start border-end py-1 d-flex align-items-center justify-content-center" style="height: 30px;">
+                                        {{ r.batch.bill_date|date:"d/m/Y"|default:"-" }}
+                                    </div>
+                                {% empty %}
+                                    <div class="py-1 d-flex align-items-center justify-content-center" style="height: 30px;">-</div>
+                                {% endfor %}
+                            </td>
+                            <td class="text-nowrap text-center text-secondary p-0 align-top">
+                                {% for r in item.receipts.all %}
+                                    <div class="border-bottom border-end py-1 d-flex align-items-center justify-content-center" style="height: 30px;">
+                                        {{ r.received_date|date:"d/m/Y" }}
+                                    </div>
+                                {% empty %}
+                                    <div class="py-1 d-flex align-items-center justify-content-center" style="height: 30px;">-</div>
+                                {% endfor %}
+                            </td>
+                            <td class="text-center p-0 align-top">
+                                {% for r in item.receipts.all %}
+                                    <div class="border-bottom border-end py-1 d-flex align-items-center justify-content-center" style="height: 30px;">
+                                        <span class="text-muted">{{ r.duration_from_order }} วัน</span>
+                                    </div>
+                                {% empty %}
+                                    <div class="py-1 d-flex align-items-center justify-content-center" style="height: 30px;">-</div>
+                                {% endfor %}
+                            </td>
+                            <td class="text-center p-0 align-top">
+                                {% for r in item.receipts.all %}
+                                    <div class="border-bottom border-end py-1 d-flex align-items-center justify-content-center" style="height: 30px;">
+                                        <span class="text-muted">{{ r.received_qty }}</span>
+                                    </div>
+                                {% empty %}
+                                    <div class="py-1 d-flex align-items-center justify-content-center" style="height: 30px;">0</div>
+                                {% endfor %}
+                            </td>
+                            <td class="text-center {% if item.total_received_qty >= item.qty_ordered %}text-success{% else %}text-warning{% endif %}">
+                                {{ item.total_received_qty }}
+                            </td>
+                            <td class="text-center fw-bold">{{ item.qty_ordered }}</td>
+                            <td class="text-center fw-bold {% if item.sku.current_stock <= 0 %}text-danger{% elif item.sku.current_stock <= item.sku.min_limit %}text-warning{% else %}text-white{% endif %}">
+                                {{ item.sku.current_stock|intcomma }}
+                            </td>
+                            <td class="text-center fw-bold {% if item.waiting_qty > 0 %}text-warning{% else %}text-muted{% endif %}">
+                                {{ item.waiting_qty|intcomma }}
+                            </td>
+                            <td class="text-end text-primary fw-bold">{{ item.unit_cost_thb|floatformat:2|intcomma }}</td>
+                            <td class="text-end">{{ item.price_yuan|floatformat:2|intcomma }}</td>
+                            <td class="text-end">{{ item.price_baht|floatformat:2|intcomma }}</td>
+                            <td class="text-center">{{ item.header.exchange_rate|floatformat:2 }}</td>
+                            <td class="text-center">{{ item.header.shipping_rate_thb_cbm|floatformat:2 }}</td>
+                            <td class="text-end">{{ item.total_received_cbm|floatformat:4|default:"-" }}</td>
+                            <td class="text-end">{{ item.total_shipping_cost|floatformat:2|intcomma }}</td>
+                            <td class="text-end">{{ item.total_received_weight|floatformat:2|default:"-" }}</td>
+                            <td class="text-end">{{ item.unit_price_yuan|floatformat:2 }}</td>
+                            <td class="text-end text-warning">{{ item.header.ref_price_shopee|floatformat:2|default:"-" }}</td>
+                            <td class="text-end text-primary">{{ item.header.ref_price_lazada|floatformat:2|default:"-" }}</td>
+                            <td class="text-end text-white fw-bold">{{ item.header.ref_price_tiktok|floatformat:2|default:"-" }}</td>
+                            <td><small class="d-block text-truncate" style="max-width: 100px" title="{{ item.header.note }}">{{ item.header.note|default:"-" }}</small></td>
+                            <td class="text-center">
+                                {% with count=item.header.attachments.count %}
+                                    {% if count > 0 %}<span class="badge bg-secondary text-white">ไฟล์ {{ count }}</span>{% else %}<span class="text-muted small">-</span>{% endif %}
+                                {% endwith %}
+                            </td>
+                            <td class="text-center">
+                                {% if item.header.link_shop %}
+                                    <button class="btn btn-sm btn-outline-info border-0" onclick="showCopyModal('Link ดูสินค้า', '{{ item.header.link_shop|escapejs }}')"><i class="bi bi-shop"></i></button>
+                                {% else %} - {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if item.header.wechat_contact %}
+                                    <button class="btn btn-sm btn-outline-success border-0" onclick="showCopyModal('Contact', '{{ item.header.wechat_contact|escapejs }}')"><i class="bi bi-chat-dots"></i></button>
+                                {% else %} - {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
+    <!-- Main Table -->
     <div class="card shadow-sm">
-
       <div class="card-body p-0">
-
         <div class="table-responsive">
-
           <table class="table table-hover table-striped align-middle mb-0" style="font-size: 0.85rem">
-
             <thead class="text-nowrap text-center text-white">
-
               <tr>
-
+                <th class="bg-dark">เลือก</th>
                 <th class="bg-dark">แก้ไข</th>
-
                 <th class="bg-primary">รหัสสินค้า</th>
-
                 <th class="bg-dark">รูป</th>
-
                 <th class="bg-dark">สถานะ</th>
-
                 <th class="bg-dark">เลข PO</th>
-
                 <th class="bg-dark">ขนส่ง</th>
-
-
-
                 <!-- Dates - Purple -->
-
                 <th style="background-color: #6f42c1">วันที่สั่งซื้อ</th>
-
                 <th style="background-color: #6f42c1">วันคาดการณ์</th>
-
                 <th style="background-color: #6f42c1">วันที่บิลเรียกเก็บ</th>
-
                 <th style="background-color: #6f42c1">วันที่ได้รับสินค้า</th>
-
                 <th style="background-color: #6f42c1">ระยะเวลา</th>
-
-
-
                 <!-- Received - Purple/Dark -->
-
                 <th style="background-color: #6f42c1">จำนวนรับ</th>
-
                 <th style="background-color: #6f42c1">รับแล้ว</th>
-
-
-
                 <!-- Ordered/Cost - Green -->
-
                 <th style="background-color: #198754">สั่งซื้อ</th>
+                
+                <!-- New Columns -->
+                <th class="bg-danger">สต็อกคงเหลือ</th>
+                <th class="bg-warning text-dark">รอเข้า</th>
 
                 <th style="background-color: #198754">ต้นทุน/ชิ้น (฿)</th>
-
-
-
                 <th class="bg-dark">ยอดหยวน (¥)</th>
-
                 <th class="bg-dark">ยอดบาทรวม (฿)</th>
-
                 <th class="bg-dark">เรทเงิน</th>
-
                 <th class="bg-dark">เรทขนส่ง</th>
-
                 <th class="bg-dark">คิว (CBM)</th>
-
                 <th class="bg-dark">ค่าส่งรวม</th>
-
                 <th class="bg-dark">น้ำหนัก (KG)</th>
-
                 <th class="bg-dark">ราคา/ชิ้น (¥)</th>
-
-
-
                 <!-- Platforms -->
-
                 <th style="background-color: #fd7e14">SHOPEE</th>
-
                 <th style="background-color: #0d6efd">LAZADA</th>
-
                 <th class="bg-black">TIKTOK</th>
-
-
-
                 <th class="bg-dark">หมายเหตุ</th>
-
-
-
                 <!-- Extra Info -->
-
                 <th class="bg-dark">เอกสารแนบ</th>
-
                 <th class="bg-dark">ร้านค้า</th>
-
                 <th class="bg-dark">ติดต่อ</th>
-
               </tr>
-
             </thead>
-
             <tbody>
-
               {% for item in po_items %}
-
               <tr>
+                <!-- 0. Select -->
+                <td class="text-center">
+                    <button type="button" class="btn btn-sm btn-primary py-0 px-1" onclick="selectItem({{ item.id }})">
+                        <i class="bi bi-plus-lg"></i>
+                    </button>
+                </td>
 
                 <!-- 1. Edit -->
-
                 <td class="text-center">
-
                   <a href="{% url 'po_detail' item.header.id %}"
                     class="btn btn-sm btn-outline-warning border-0 p-0 text-warning" title="Edit">
-
                     <i class="bi bi-pencil-square"></i>
-
                   </a>
-
                 </td>
-
-
 
                 <!-- 2. SKU -->
-
                 <td class="fw-bold text-primary">
-
                   {{ item.sku.product_code }}
-
                 </td>
-
-
 
                 <!-- 3. Image -->
-
                 <td class="text-center">
-
                   {% if item.sku.image %}
-
                   <img src="{{ item.sku.image.url }}" class="rounded"
                     style="height: 35px; width: 35px; object-fit: cover" />
-
                   {% else %}
-
                   <span class="text-muted small">-</span>
-
                   {% endif %}
-
                 </td>
 
-
-
                 <!-- 4. Status -->
-
                 <td class="text-center">
                   {% if item.header.status == 'Pending' %}
                   <span class="badge rounded-pill bg-primary text-dark">รอจัดส่ง</span>
@@ -349,372 +454,207 @@
                   {% endif %}
                 </td>
 
-
-
                 <!-- 5. PO No -->
-
                 <td>
-
                   <a href="{% url 'po_detail' item.header.id %}" class="text-info text-decoration-none">
-
                     {{ item.header.po_number }}
-
                   </a>
-
                 </td>
-
-
 
                 <!-- 6. Shipping Type -->
-
                 <td class="text-center">
-
                   {{ item.header.get_shipping_type_display|default:"-" }}
-
                 </td>
-
-
 
                 <!-- 7. Order Date -->
-
                 <td class="text-nowrap">
-
                   {{ item.header.order_date|date:"d/m/Y" }}
-
                 </td>
-
-
 
                 <!-- 8. Est Date -->
-
                 <td class="text-nowrap">
-
                   {{ item.header.estimated_date|date:"d/m/Y"|default:"-" }}
-
                 </td>
 
-
-
                 <!-- 9. Last Bill Date -->
-
                 <td class="text-nowrap text-center text-secondary p-0 align-top">
-
                   {% for r in item.receipts.all %}
-
                   <div
                     class="border-bottom border-start border-end py-1 d-flex align-items-center justify-content-center"
                     style="height: 30px;">
-
                     {{ r.batch.bill_date|date:"d/m/Y"|default:"-" }}
-
                   </div>
-
                   {% empty %}
-
                   <div class="py-1 d-flex align-items-center justify-content-center" style="height: 30px;">-</div>
-
                   {% endfor %}
-
                 </td>
-
-
 
                 <!-- 10. Last Received Date -->
-
                 <td class="text-nowrap text-center text-secondary p-0 align-top">
-
                   {% for r in item.receipts.all %}
-
                   <div class="border-bottom  border-end py-1 d-flex align-items-center justify-content-center"
                     style="height: 30px;">
-
                     {{ r.received_date|date:"d/m/Y" }}
-
                   </div>
-
                   {% empty %}
-
                   <div class="py-1 d-flex align-items-center justify-content-center" style="height: 30px;">-</div>
-
                   {% endfor %}
-
                 </td>
-
-
 
                 <!-- 11. Duration -->
-
                 <td class="text-center p-0 align-top">
-
                   {% for r in item.receipts.all %}
-
                   <div class="border-bottom  border-end py-1 d-flex align-items-center justify-content-center"
                     style="height: 30px;">
-
                     <span class="text-muted">{{ r.duration_from_order }} วัน</span>
-
                   </div>
-
                   {% empty %}
-
                   <div class="py-1 d-flex align-items-center justify-content-center" style="height: 30px;">-</div>
-
                   {% endfor %}
-
                 </td>
-
-
 
                 <!-- 12. Received Qty Status -->
-
                 <td class="text-center p-0 align-top">
-
                   {% for r in item.receipts.all %}
-
                   <div class="border-bottom border-end py-1 d-flex align-items-center justify-content-center"
                     style="height: 30px;">
-
                     <span class="text-muted">{{ r.received_qty }}</span>
-
-
-
                   </div>
-
                   {% empty %}
-
                   <div class="py-1 d-flex align-items-center justify-content-center" style="height: 30px;">0</div>
-
                   {% endfor %}
-
                 </td>
-
-
 
                 <td
                   class="text-center {% if item.total_received_qty >= item.qty_ordered %}text-success{% else %}text-warning{% endif %}">
-
                   {{ item.total_received_qty }}
-
                 </td>
-
-
 
                 <!-- 13. Ordered Qty -->
-
                 <td class="text-center fw-bold">{{ item.qty_ordered }}</td>
 
-
+                <!-- สต็อกคงเหลือ -->
+                <td class="text-center fw-bold {% if item.sku.current_stock <= 0 %}text-danger{% elif item.sku.current_stock <= item.sku.min_limit %}text-warning{% else %}text-white{% endif %}">
+                    {{ item.sku.current_stock|intcomma }}
+                </td>
+                
+                <!-- รอเข้า -->
+                <td class="text-center fw-bold {% if item.waiting_qty > 0 %}text-warning{% else %}text-muted{% endif %}">
+                    {{ item.waiting_qty|intcomma }}
+                </td>
 
                 <!-- 14. Unit Cost THB -->
-
                 <td class="text-end text-primary fw-bold">
-
                   {{ item.unit_cost_thb|floatformat:2|intcomma }}
-
                 </td>
-
-
 
                 <!-- 15. Total Yuan -->
-
                 <td class="text-end">
-
                   {{ item.price_yuan|floatformat:2|intcomma }}
-
                 </td>
-
-
 
                 <!-- 16. Total Baht -->
-
                 <td class="text-end">
-
                   {{ item.price_baht|floatformat:2|intcomma }}
-
                 </td>
-
-
 
                 <!-- 17. Ex Rate -->
-
                 <td class="text-center">
-
                   {{ item.header.exchange_rate|floatformat:2 }}
-
                 </td>
-
-
 
                 <!-- 18. Shipping Rate -->
-
                 <td class="text-center">
-
                   {{ item.header.shipping_rate_thb_cbm|floatformat:2 }}
-
                 </td>
-
-
 
                 <!-- 19. Total CBM -->
-
                 <td class="text-end">
-
                   {{ item.total_received_cbm|floatformat:4|default:"-" }}
-
                 </td>
-
-
 
                 <!-- 20. Total Shipping Cost -->
-
                 <td class="text-end">
-
                   {{ item.total_shipping_cost|floatformat:2|intcomma }}
-
                 </td>
-
-
 
                 <!-- 21. Total Weight -->
-
                 <td class="text-end">
-
                   {{ item.total_received_weight|floatformat:2|default:"-" }}
-
                 </td>
-
-
 
                 <!-- 22. Unit Price Yuan -->
-
                 <td class="text-end">
-
                   {{ item.unit_price_yuan|floatformat:2 }}
-
                 </td>
-
-
 
                 <!-- 23. Ref Prices -->
-
                 <td class="text-end text-warning">
-
                   {{ item.header.ref_price_shopee|floatformat:2|default:"-" }}
-
                 </td>
-
                 <td class="text-end text-primary">
-
                   {{ item.header.ref_price_lazada|floatformat:2|default:"-" }}
-
                 </td>
-
                 <td class="text-end text-white fw-bold">
-
                   {{ item.header.ref_price_tiktok|floatformat:2|default:"-" }}
-
                 </td>
-
-
 
                 <!-- 24. Note -->
-
                 <td>
-
                   <small class="d-block text-truncate" style="max-width: 100px" title="{{ item.header.note }}">
-
                     {{ item.header.note|default:"-" }}
-
                   </small>
-
                 </td>
-
-
 
                 <!-- Extra: Attachments -->
-
                 <td class="text-center">
-
                   {% with count=item.header.attachments.count %}
-
                   {% if count > 0 %}
-
                   <span class="badge bg-secondary text-white">ไฟล์ {{ count }}</span>
-
                   {% else %}
-
                   <span class="text-muted small">-</span>
-
                   {% endif %}
-
                   {% endwith %}
-
                 </td>
-
-
 
                 <!-- Extra: Shop Link -->
-
                 <td class="text-center">
-
                   {% if item.header.link_shop %}
-
                   <button class="btn btn-sm btn-outline-info border-0"
                     onclick="showCopyModal('Link ดูสินค้า', '{{ item.header.link_shop|escapejs }}')">
-
                     <i class="bi bi-shop"></i>
-
                   </button>
-
                   {% else %} - {% endif %}
-
                 </td>
-
-
 
                 <!-- Extra: Contact -->
-
                 <td class="text-center">
-
                   {% if item.header.wechat_contact %}
-
                   <button class="btn btn-sm btn-outline-success border-0"
                     onclick="showCopyModal('Contact', '{{ item.header.wechat_contact|escapejs }}')">
-
                     <i class="bi bi-chat-dots"></i>
-
                   </button>
-
                   {% else %} - {% endif %}
-
                 </td>
-
               </tr>
-
               {% empty %}
-
               <tr>
-
-                <td colspan="29" class="text-center py-5 text-muted">
-
+                <td colspan="33" class="text-center py-5 text-muted">
                   <i class="bi bi-inbox fs-1 d-block mb-3"></i>
-
                   ไม่พบรายการสั่งซื้อ (No PO Found)
-
                 </td>
-
               </tr>
-
               {% endfor %}
-
             </tbody>
             <tfoot class="table-group-divider fw-bold" style="background-color: #f8f9fa;">
               <tr>
-                <td colspan="12" class="text-end">รวมทั้งหมด (Summary):</td>
+                <td colspan="13" class="text-end">รวมทั้งหมด (Summary):</td>
                 <!-- 13. Received Total -->
                 <td class="text-center">{{ footer_summary.total_received|intcomma }}</td>
                 <!-- 14. Ordered Qty -->
                 <td class="text-center">{{ footer_summary.total_ordered|intcomma }}</td>
+                <!-- stock/waiting placeholder -->
+                <td></td><td></td>
                 <!-- 15. Unit Cost THB -->
                 <td class="text-end">{{ footer_summary.avg_price|floatformat:2|intcomma }}</td>
                 <!-- 16. Total Yuan -->
@@ -738,21 +678,84 @@
               </tr>
             </tfoot>
           </table>
-
         </div>
-
       </div>
-
     </div>
 
   </div>
-
-</div>
-
-</div>
 </div>
 
 <script>
+  // Fast Status Filter
+  function setFastFilter(status) {
+    const select = document.querySelector('select[name="status"]');
+    if (select) {
+      select.value = status;
+      select.form.submit();
+    }
+  }
+
+  // Selection Management
+  function selectItem(id) {
+      let selected = document.getElementById('selected_ids').value;
+      let ids = selected ? selected.split(',') : [];
+      if (!ids.includes(id.toString())) {
+          ids.push(id.toString());
+          document.getElementById('selected_ids').value = ids.join(',');
+          document.getElementById('searchForm').submit();
+      }
+  }
+
+  function removeItem(id) {
+      let selected = document.getElementById('selected_ids').value;
+      let ids = selected ? selected.split(',') : [];
+      let newIds = ids.filter(x => x !== id.toString());
+      document.getElementById('selected_ids').value = newIds.join(',');
+      document.getElementById('searchForm').submit();
+  }
+
+  function clearSelected() {
+      document.getElementById('selected_ids').value = '';
+      document.getElementById('searchForm').submit();
+  }
+
+  // Cascading Filter Logic (Datalists)
+  const poInput = document.getElementById('po_number_input');
+  const searchInput = document.getElementById('search_input');
+  const poList = document.getElementById('po_list');
+  const skuList = document.getElementById('sku_list');
+
+  async function updateOptions() {
+      const poVal = poInput.value;
+      const searchVal = searchInput.value;
+
+      try {
+          const response = await fetch(`{% url 'get_search_options' %}?po_number=${encodeURIComponent(poVal)}&sku_query=${encodeURIComponent(searchVal)}`);
+          const data = await response.json();
+
+          poList.innerHTML = '';
+          data.pos.forEach(po => {
+              const opt = document.createElement('option');
+              opt.value = po;
+              poList.appendChild(opt);
+          });
+
+          skuList.innerHTML = '';
+          data.skus.forEach(sku => {
+              const opt = document.createElement('option');
+              opt.value = sku;
+              skuList.appendChild(opt);
+          });
+      } catch (e) {
+          console.error('Failed to fetch options', e);
+      }
+  }
+
+  poInput.addEventListener('input', updateOptions);
+  searchInput.addEventListener('input', updateOptions);
+  updateOptions(); // Initial fetch
+
+  // Copy functionality
   function showCopyModal(title, text) {
     document.getElementById("copyModalTitle").textContent = title;
     document.getElementById("copyInput").value = text;
@@ -795,6 +798,13 @@
 
   .hover-opacity-100:hover {
     opacity: 1 !important;
+  }
+  
+  .btn-xs {
+      padding: 1px 5px;
+      font-size: 0.75rem;
+      line-height: 1.5;
+      border-radius: 3px;
   }
 </style>
 {% endblock %}

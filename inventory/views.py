@@ -208,6 +208,9 @@ def po_list_view(request):
     po_number_query = request.GET.get('po_number', '').strip()
     search_query = request.GET.get('search', '').strip()
     status_filter = request.GET.get('status', '')
+    selected_ids_str = request.GET.get('selected_ids', '').strip()
+    
+    selected_ids = [int(x) for x in selected_ids_str.split(',') if x.isdigit()]
     
     # Date Filters
     start_date_str = request.GET.get('start_date', '')
@@ -215,6 +218,17 @@ def po_list_view(request):
     bill_start_date_str = request.GET.get('bill_start_date', '')
     bill_end_date_str = request.GET.get('bill_end_date', '')
     
+    # Handle Selected Items
+    selected_items = []
+    if selected_ids:
+        preserved_order = {id: pos for pos, id in enumerate(selected_ids)}
+        items_objs = POItem.objects.filter(id__in=selected_ids).select_related('header', 'sku').prefetch_related('receipts', 'header__attachments', 'receipts__batch')
+        selected_items = sorted(items_objs, key=lambda x: preserved_order.get(x.id, 999))
+        
+        for item in selected_items:
+            # Calculate waiting qty
+            item.waiting_qty = max(0, item.qty_ordered - item.total_received_qty)
+
     # Base Query
     items = POItem.objects.all().select_related('header', 'sku').prefetch_related('receipts', 'header__attachments', 'receipts__batch').order_by('-header__order_date')
     
@@ -258,6 +272,8 @@ def po_list_view(request):
             items = items.filter(header__status='Pending', received_sum__isnull=True) # or 0
         elif status_filter == 'overdue':
             items = items.exclude(header__status='Complete').filter(header__estimated_date__lt=date.today())
+        elif status_filter == 'not_arrived':
+            items = items.filter(header__status__in=['Pending', 'Arriving Soon', 'Overdue'])
         else:
             # Match standard status (Pending, Complete)
             items = items.filter(header__status=status_filter)
@@ -267,6 +283,10 @@ def po_list_view(request):
     selected_category = request.GET.get('category', '')
     if selected_category:
         items = items.filter(sku__category=selected_category)
+
+    # For each item, we need to calculate waiting_qty for the main table too
+    for item in items:
+        item.waiting_qty = max(0, item.qty_ordered - item.total_received_qty)
         
     # --- Summary Metrics (On Filtered Data) ---
     summary = {
@@ -279,61 +299,30 @@ def po_list_view(request):
         'shipping_cost': 0,
     }
     
-    # For Status Counts, we need to apply logic.
-    # Since we can't easily do conditional Count on computed logic in DB for everything without complex annotations,
-    # and "items" is already filtered by status_filter (if present), the Summary might look weird if we only show 1 status card when filtered.
-    # BUT typically dashboards show "Current View Summary". So if I filter "Pending", "Complete" card should be 0.
-    
     # 1. Total Shipping (Imported Only)
-    # Filter imported items from CURRENT queryset
     imported_items = items.filter(header__order_type='IMPORTED')
     shipping_agg = imported_items.annotate(
         cost=ExpressionWrapper(
-            F('total_received_cbm') * F('header__shipping_rate_thb_cbm'),
+            F('total_received_cbm') * Coalesce(F('header__shipping_rate_thb_cbm'), Decimal(0)),
             output_field=DecimalField()
         )
     ).aggregate(total=Sum('cost'))
     summary['shipping_cost'] = shipping_agg['total'] or 0
 
     # 2. Status Counts
-    # We can iterate or run separate count queries. Accessing .count() on filtered querysets is generally fast.
-    # Note: If 'status_filter' is applied, 'items' is already narrowed. 
-    # If user wants "Global Stats" regardless of filter, we should use a fresh queryset.
-    # User Request: "รายการทั้งหมด นับจำนวนแถวในฟิลเตอร์นี้" (Total items in THIS filter).
-    # So implies other cards should also respect the filter?
-    # "รอจัดส่ง นับจำนวนสถานะ", "สินค้าใกล้ถึง นับจำนวนสถานะ"...
-    # Usually summary cards break down the current subset.
-    
-    # However, filtering by "Pending" makes "Complete" count 0. This is standard behavior.
-    # Let's verify status Logic on the current 'items' queryset.
-    
-    # Using aggregations/annotations to count in one go if possible, but logic is complex (dates, sums).
-    # Separate queries are clearer for maintenance.
-    
-    # Waiting Shipment: Pending & No Receipt
     summary['waiting'] = items.annotate(rcv=Sum('receipts__received_qty')).filter(header__status='Pending', rcv__isnull=True).count()
     
-    # Arriving Soon: Pending & Date range
     next_week = date.today() + timedelta(days=7)
     summary['arriving'] = items.filter(
         header__status='Pending', 
         header__estimated_date__range=[date.today(), next_week]
     ).count()
     
-    # Incomplete: Pending & Received > 0
     summary['incomplete'] = items.annotate(rcv=Sum('receipts__received_qty')).filter(header__status='Pending', rcv__gt=0).count()
-    
-    # Overdue
     summary['overdue'] = items.exclude(header__status='Complete').filter(header__estimated_date__lt=date.today()).count()
-    
-    # Complete
     summary['complete'] = items.filter(header__status='Complete').count()
 
     # --- Footer/Table Totals (All Filtered Items) ---
-    # We need: Ordered Qty, Received Qty, Price Yuan, Price Baht, CBM, Weight, Shipping Cost
-    # Note: Shipping Cost logic = CBM * Header Rate (for imported). 
-    # For Domestic, if rate is 0, it's 0.
-    
     footer_aggs = items.annotate(
         shipping_cost=ExpressionWrapper(
             F('total_received_cbm') * Coalesce(F('header__shipping_rate_thb_cbm'), Decimal(0)),
@@ -349,8 +338,6 @@ def po_list_view(request):
         total_shipping=Sum('shipping_cost')
     )
     
-    # Calculate Average Price/Piece
-    # Rule: (Total Baht + Total Shipping) / Total Ordered Qty
     t_baht = footer_aggs['total_baht'] or Decimal(0)
     t_ship = footer_aggs['total_shipping'] or Decimal(0)
     t_qty = footer_aggs['total_ordered'] or 0
@@ -372,13 +359,13 @@ def po_list_view(request):
 
     context = {
         'po_items': items,
+        'selected_items': selected_items,
         'po_number_query': po_number_query,
         'search_query': search_query,
         'status_filter': status_filter,
+        'selected_ids_str': selected_ids_str,
         'categories': categories,
         'selected_category': selected_category,
-        
-        # New Context
         'start_date': start_date_str,
         'end_date': end_date_str,
         'bill_start_date': bill_start_date_str,
@@ -760,7 +747,8 @@ def logout_view(request):
 def daily_sales_view(request):
     # Standard Date Handling
     today = date.today()
-    default_end = today + timedelta(days=30)
+    default_end = date.today()
+    # default_end = today + timedelta(days=30)
     
     # Session Persistence Logic
     if not request.GET and 'sales_filter_mode' in request.session:
@@ -1563,72 +1551,6 @@ def get_sales_history(request, sku):
     }
     
     return render(request, 'inventory/partials/sales_history_table.html', context)
-
-@login_required
-def po_search_view(request):
-    po_number_query = request.GET.get('po_number', '').strip()
-    search_query = request.GET.get('search', '').strip()
-    selected_ids_str = request.GET.get('selected_ids', '').strip()
-    
-    selected_ids = [int(x) for x in selected_ids_str.split(',') if x.isdigit()]
-    
-    # 1. Fetch Selected Items (Preserve Order of selection)
-    selected_items = []
-    if selected_ids:
-        # To maintain order, we can't just use __in
-        preserved_order = {id: pos for pos, id in enumerate(selected_ids)}
-        items_objs = POItem.objects.filter(id__in=selected_ids).select_related('header', 'sku').prefetch_related('receipts')
-        selected_items = sorted(items_objs, key=lambda x: preserved_order.get(x.id, 999))
-        
-        for item in selected_items:
-            latest_receipt = item.receipts.order_by('-received_date').first()
-            item.latest_received_date = latest_receipt.received_date if latest_receipt else None
-            if item.latest_received_date and item.header.order_date:
-                item.duration = (item.latest_received_date - item.header.order_date).days
-            else:
-                item.duration = None
-
-    # 2. Main Search Results
-    # Start with all PO items
-    items = POItem.objects.all().select_related('header', 'sku').prefetch_related('receipts').order_by('-header__order_date')
-    
-    # Filter by PO Number
-    if po_number_query:
-        items = items.filter(header__po_number__icontains=po_number_query)
-        
-    # Filter by Product SKU/Name
-    if search_query:
-        items = items.filter(Q(sku__product_code__icontains=search_query) | Q(sku__name__icontains=search_query))
-
-    # Exclude already selected items from the bottom table if they match the search
-    # This keeps things clean.
-    if selected_ids:
-        items = items.exclude(id__in=selected_ids)
-
-    # For each item, we need to calculate/fetch extra info
-    # Limit to e.g. 50 items if no specific search to avoid performance issues
-    if not po_number_query and not search_query:
-        items = items[:50]
-
-    for item in items:
-        # Latest Receipt Date
-        latest_receipt = item.receipts.order_by('-received_date').first()
-        item.latest_received_date = latest_receipt.received_date if latest_receipt else None
-        
-        # Duration
-        if item.latest_received_date and item.header.order_date:
-            item.duration = (item.latest_received_date - item.header.order_date).days
-        else:
-            item.duration = None
-
-    context = {
-        'items': items,
-        'selected_items': selected_items,
-        'po_number_query': po_number_query,
-        'search_query': search_query,
-        'selected_ids_str': selected_ids_str,
-    }
-    return render(request, 'inventory/po_search.html', context)
 
 @login_required
 def get_search_options(request):

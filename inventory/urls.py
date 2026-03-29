@@ -11,7 +11,6 @@ urlpatterns = [
     path('', views.daily_sales_view, name='sales_summary'), # Home is sales summary
     path('stock/', views.stock_report_view, name='stock_report'),
     path('po/', views.po_list_view, name='po_list'),
-    path('search/', views.po_search_view, name='po_search'),
     path('search/options/', views.get_search_options, name='get_search_options'),
     path('suppliers/', views.supplier_info_view, name='supplier_info'),
     path('suppliers/save/', views.save_supplier_info, name='save_supplier_info'),
