@@ -1035,10 +1035,26 @@ def stock_report_view(request):
     # Let's do this efficiently.
     # Group by SKU, filter PO Status=Pending
     
-    pending_items = POItem.objects.filter(header__status='Pending').values('sku').annotate(
+    # รวม qty รอเข้าจากทุก status ที่ยังไม่รับครบ (ยกเว้น Complete)
+    # - Pending / Arriving Soon / Overdue : นับ qty_ordered ทั้งหมด (ยังไม่ได้รับอะไรเลย หรือส่วนที่ยังค้างอยู่)
+    # - Incomplete : นับเฉพาะส่วนที่ยังไม่ได้รับ (qty_ordered - total_received_qty)
+    open_statuses = ['Pending', 'Arriving Soon', 'Overdue']
+    pending_items = POItem.objects.filter(
+        header__status__in=open_statuses
+    ).values('sku').annotate(
         total_pending=Sum('qty_ordered')
     )
     pending_map = {p['sku']: p['total_pending'] for p in pending_items}
+
+    incomplete_items = POItem.objects.filter(
+        header__status='Incomplete'
+    ).values('sku').annotate(
+        remaining=Sum(F('qty_ordered') - F('total_received_qty'))
+    )
+    for p in incomplete_items:
+        sku = p['sku']
+        remaining = max(p['remaining'] or 0, 0)
+        pending_map[sku] = pending_map.get(sku, 0) + remaining
     
     # Arriving Logic: Pending AND Estimated Date <= next 7 days
     arriving_items = POItem.objects.filter(
