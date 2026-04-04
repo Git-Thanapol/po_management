@@ -235,7 +235,7 @@
                  <input type="text" id="view_unit_yuan_${rowCount}" class="form-control form-control-sm text-end border-0 bg-transparent" readonly value="0.00">
             </td>
              <td class="import-col">
-                 <input type="text" id="view_total_yuan_${rowCount}" class="form-control form-control-sm text-end border-0 bg-transparent" readonly value="0.00">
+                 <input type="number" step="0.01" id="view_total_yuan_${rowCount}" class="form-control form-control-sm text-end" value="0.00" oninput="recalcFromLine(${rowCount})" title="แก้ไขราคารวมหยวนต่อรายการได้โดยตรง">
             </td>
              <td class="import-col">
                  <input type="text" id="view_total_baht_${rowCount}" class="form-control form-control-sm text-end border-0 bg-transparent" readonly value="0.00">
@@ -428,6 +428,40 @@
       if (sumVatEl) sumVatEl.innerText = sumVat.toFixed(2);
       if (sumTotalEl) sumTotalEl.innerText = sumTotal.toFixed(2);
     }
+  }
+
+  // Bottom-up: ปรับราคารวม (¥) ต่อรายการ → คำนวณ unit yuan + header total yuan
+  function recalcFromLine(lineId) {
+    const type = document.getElementById("order_type").value;
+    if (type !== 'IMPORTED') return;
+
+    const exchangeRate = parseFloat(document.getElementById('exchange_rate')?.value) || 1.0;
+
+    const lineYuanEl = document.getElementById(`view_total_yuan_${lineId}`);
+    const qtyEl = document.querySelector(`input[name="qty_${lineId}"]`);
+    const unitYuanEl = document.getElementById(`view_unit_yuan_${lineId}`);
+    const totalBahtEl = document.getElementById(`view_total_baht_${lineId}`);
+
+    const lineYuan = parseFloat(lineYuanEl?.value) || 0;
+    const qty = parseFloat(qtyEl?.value) || 1;
+
+    // อัปเดต unit yuan และ baht ของ line นี้
+    if (unitYuanEl) unitYuanEl.value = qty > 0 ? (lineYuan / qty).toFixed(4) : '0.0000';
+    if (totalBahtEl) totalBahtEl.value = (lineYuan * exchangeRate).toFixed(2);
+
+    // รวม yuan ทุก line → อัปเดต header total yuan
+    let totalYuan = 0;
+    document.querySelectorAll('[id^="view_total_yuan_"]').forEach(inp => {
+      totalYuan += parseFloat(inp.value) || 0;
+    });
+    const headerTotalYuanEl = document.getElementById('total_yuan');
+    if (headerTotalYuanEl) headerTotalYuanEl.value = totalYuan.toFixed(2);
+
+    // อัปเดต footer
+    const sumYuanEl = document.getElementById('sumYuan');
+    const sumBahtEl = document.getElementById('sumBaht');
+    if (sumYuanEl) sumYuanEl.innerText = totalYuan.toFixed(2);
+    if (sumBahtEl) sumBahtEl.innerText = (totalYuan * exchangeRate).toFixed(2);
   }
 
   // Init
