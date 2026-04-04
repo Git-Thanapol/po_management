@@ -205,6 +205,11 @@ def process_import_background(log_id, file_path, import_type):
 
 @login_required
 def po_list_view(request):
+    # Refresh statuses for all non-Complete POs so date-based transitions are current
+    stale_headers = POHeader.objects.exclude(status='Complete')
+    for h in stale_headers:
+        h.update_status()
+
     po_number_query = request.GET.get('po_number', '').strip()
     search_query = request.GET.get('search', '').strip()
     status_filter = request.GET.get('status', '')
@@ -258,24 +263,9 @@ def po_list_view(request):
         items = items.filter(Q(sku__product_code__icontains=search_query) | Q(sku__name__icontains=search_query))
         
     if status_filter:
-        if status_filter == 'arriving_soon':
-            # Next 7 days
-            next_week = date.today() + timedelta(days=7)
-            items = items.filter(header__status='Pending', header__estimated_date__range=[date.today(), next_week])
-        elif status_filter == 'incomplete':
-            # Pending but has received some
-            items = items.annotate(received_sum=Sum('receipts__received_qty'))
-            items = items.filter(header__status='Pending', received_sum__gt=0)
-        elif status_filter == 'waiting_shipment':
-            # Pending and No Receipts
-            items = items.annotate(received_sum=Sum('receipts__received_qty'))
-            items = items.filter(header__status='Pending', received_sum__isnull=True) # or 0
-        elif status_filter == 'overdue':
-            items = items.exclude(header__status='Complete').filter(header__estimated_date__lt=date.today())
-        elif status_filter == 'not_arrived':
-            items = items.filter(header__status__in=['Pending', 'Arriving Soon', 'Overdue'])
+        if status_filter == 'not_arrived':
+            items = items.filter(header__status__in=['Pending', 'Arriving Soon', 'Overdue', 'Incomplete'])
         else:
-            # Match standard status (Pending, Complete)
             items = items.filter(header__status=status_filter)
         
     # Category Filter
@@ -309,17 +299,11 @@ def po_list_view(request):
     ).aggregate(total=Sum('cost'))
     summary['shipping_cost'] = shipping_agg['total'] or 0
 
-    # 2. Status Counts
-    summary['waiting'] = items.annotate(rcv=Sum('receipts__received_qty')).filter(header__status='Pending', rcv__isnull=True).count()
-    
-    next_week = date.today() + timedelta(days=7)
-    summary['arriving'] = items.filter(
-        header__status='Pending', 
-        header__estimated_date__range=[date.today(), next_week]
-    ).count()
-    
-    summary['incomplete'] = items.annotate(rcv=Sum('receipts__received_qty')).filter(header__status='Pending', rcv__gt=0).count()
-    summary['overdue'] = items.exclude(header__status='Complete').filter(header__estimated_date__lt=date.today()).count()
+    # 2. Status Counts — ใช้ header.status ที่ refresh แล้วโดยตรง
+    summary['waiting'] = items.filter(header__status='Pending').count()
+    summary['arriving'] = items.filter(header__status='Arriving Soon').count()
+    summary['incomplete'] = items.filter(header__status='Incomplete').count()
+    summary['overdue'] = items.filter(header__status='Overdue').count()
     summary['complete'] = items.filter(header__status='Complete').count()
 
     # --- Footer/Table Totals (All Filtered Items) ---
