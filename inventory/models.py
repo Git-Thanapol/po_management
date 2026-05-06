@@ -93,6 +93,12 @@ class POHeader(models.Model):
     # Status is now dynamic but we can store the last calculated state for easy querying
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default=STATUS_PENDING, verbose_name="สถานะ")
 
+    YUAN_MODE_CHOICES = [
+        ('top-down', 'Top-down (Prorate)'),
+        ('bottom-up', 'Bottom-up (Manual)'),
+    ]
+    yuan_mode = models.CharField(max_length=20, choices=YUAN_MODE_CHOICES, default='top-down', verbose_name="โหมดราคาหยวน")
+
     def save(self, *args, **kwargs):
         # Auto-calculate estimated date if missing
         if not self.estimated_date and self.order_date:
@@ -100,13 +106,14 @@ class POHeader(models.Model):
                 self.estimated_date = self.order_date + timedelta(days=14)
             elif self.shipping_type == 'SHIP':
                 self.estimated_date = self.order_date + timedelta(days=25)
-        
+
         super().save(*args, **kwargs)
-        # Trigger Proration update after save? 
+        # Trigger Proration update after save?
         # Better to do it explicitly or via signal, but here is safe for simple updates.
         # Only if PK exists (update)
         if self.pk:
-            self.prorate_costs()
+            if self.yuan_mode == 'top-down':
+                self.prorate_costs()
             self.update_status()
 
     def prorate_costs(self):
@@ -114,6 +121,9 @@ class POHeader(models.Model):
         Prorate total_yuan to items based on qty_ordered.
         Item Total Yuan = Header.total_yuan * (Item.qty_ordered / Header.total_qty)
         """
+        if self.yuan_mode == 'bottom-up':
+            return
+
         items = self.items.all()
         total_qty = items.aggregate(sum_qty=Sum('qty_ordered'))['sum_qty'] or 0
         

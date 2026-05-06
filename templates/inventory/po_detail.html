@@ -176,8 +176,16 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
       <div class="col-md-2">
         <label class="form-label text-muted small">ยอดหยวนรวม (Total Yuan)</label>
         <input type="number" step="0.01" name="total_yuan"
-          class="form-control bg-dark text-white border-secondary fw-bold text-success" value="{{ po.total_yuan }}" />
-        <small class="text-muted">แก้ไขค่านี้ระบบจะเฉลี่ยต้นทุนใหม่ (Triggers Proration)</small>
+          class="form-control bg-dark text-white border-secondary fw-bold text-success" value="{{ po.total_yuan }}" 
+          {% if po.yuan_mode == 'bottom-up' %}readonly style="opacity:0.7;"{% endif %}/>
+        <small class="text-muted">{% if po.yuan_mode == 'bottom-up' %}🔒 ล็อค - คำนวณจากผลรวมต่อรายการ{% else %}เฉลี่ยต้นทุนใหม่ (Triggers Proration){% endif %}</small>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label text-muted small">โหมดราคา (Yuan Mode)</label>
+        <select name="yuan_mode" class="form-select bg-dark text-white border-secondary small">
+          <option value="top-down" {% if po.yuan_mode == 'top-down' %}selected{% endif %}>Top-down (Prorate)</option>
+          <option value="bottom-up" {% if po.yuan_mode == 'bottom-up' %}selected{% endif %}>Bottom-up (Manual)</option>
+        </select>
       </div>
       {% endif %}
 
@@ -330,6 +338,14 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
             <td class="text-end bg-secondary bg-opacity-10">
               <!-- Calculate Total: Price * Qty + VAT. Using price_baht which should store this -->
               <div class="fw-bold text-success">{{ item.price_baht|floatformat:2|intcomma }}</div>
+              {% if po.yuan_mode == 'bottom-up' and po.order_type == 'IMPORTED' %}
+              <div class="mt-1 d-flex align-items-center justify-content-end gap-1">
+                <span class="text-muted" style="font-size: 0.65rem;">¥</span>
+                <input type="number" step="0.01" name="price_yuan_{{ item.id }}" 
+                  class="form-control form-control-sm bg-dark text-white border-success p-0 px-1 text-end"
+                  style="width: 70px; font-size: 0.75rem;" value="{{ item.price_yuan|floatformat:2 }}">
+              </div>
+              {% endif %}
             </td>
             {% comment %} {% if po.order_type == 'DOMESTIC' %}
             {% endif %} {% endcomment %}

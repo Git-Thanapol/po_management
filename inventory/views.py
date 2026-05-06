@@ -421,6 +421,9 @@ def po_detail_view(request, po_id):
                 po.total_yuan = Decimal(request.POST.get('total_yuan', 0) or 0)
                 po.shipping_rate_thb_cbm = Decimal(request.POST.get('shipping_rate_thb_cbm', 0) or 0)
                 
+                if 'yuan_mode' in request.POST:
+                    po.yuan_mode = request.POST.get('yuan_mode')
+
                 bill_date_str = request.POST.get('bill_date')
                 if bill_date_str:
                     po.bill_date = datetime.strptime(bill_date_str, '%Y-%m-%d').date()
@@ -449,7 +452,10 @@ def po_detail_view(request, po_id):
                 # po.tracking_no = request.POST.get('tracking_no', '')
                 
                 po.save()
-                po.prorate_costs() # Recalculate costs if Total Yuan Changed
+                
+                if po.yuan_mode == 'top-down':
+                    po.prorate_costs() # Recalculate costs if Total Yuan Changed
+                
                 po.update_status()
                 
                 # Handle Files
@@ -484,10 +490,24 @@ def po_detail_view(request, po_id):
                         
                         item = POItem.objects.get(id=item_id, header=po)
                         item.qty_ordered = qty
+                        
+                        # Handle Manual Price Yuan if in bottom-up mode
+                        if po.order_type == 'IMPORTED' and po.yuan_mode == 'bottom-up':
+                            manual_yuan = request.POST.get(f'price_yuan_{item_id}')
+                            if manual_yuan is not None:
+                                item.price_yuan = Decimal(manual_yuan or 0)
+                                item.price_baht = item.price_yuan * po.exchange_rate
+                        
                         item.save()
                         count_update += 1
                     except Exception as e:
                         print(f"Error updating item {key}: {e}")
+
+            # Recalculate Header Total Yuan if in bottom-up mode after items update
+            if po.order_type == 'IMPORTED' and po.yuan_mode == 'bottom-up':
+                total_yuan = po.items.aggregate(total=Sum('price_yuan'))['total'] or 0
+                po.total_yuan = total_yuan
+                po.save()
 
             # 2. Receive Logic (Static 5 Batches)
             # Loop through Batch 1 to 5
@@ -1270,6 +1290,7 @@ def po_create_view(request):
             # New Fields
             total_yuan = get_decimal('total_yuan', 0)
             shipping_rate_thb_cbm = get_decimal('shipping_rate_thb_cbm', 0)
+            yuan_mode = request.POST.get('yuan_mode', 'top-down')
             
             # VAT Rate
             vat_rate = get_decimal('vat_rate', 7.0)
@@ -1297,7 +1318,8 @@ def po_create_view(request):
                 ref_price_lazada=lazada_price,
                 ref_price_tiktok=tiktok_price,
                 note=note,
-                status='Pending'
+                status='Pending',
+                yuan_mode=yuan_mode
             )
             
             # Handle Attachment (Single file for now as per simple implementation)
@@ -1324,20 +1346,28 @@ def po_create_view(request):
                         
                     qty = int(get_decimal(f'qty_{row_id}', 1))
                     unit_price = get_decimal(f'unit_price_{row_id}', 0)
+
+                    item_price_yuan = 0
+                    item_price_baht = 0
+                    if order_type == 'IMPORTED' and yuan_mode == 'bottom-up':
+                        item_price_yuan = get_decimal(f'total_yuan_{row_id}', 0)
+                        item_price_baht = item_price_yuan * exchange_rate
                     
                     # Create Item with Qty Only (Costs calc later or now for Domestic)
                     POItem.objects.create(
                         header=po,
                         sku=master_item,
                         qty_ordered=int(qty),
-                        unit_price=unit_price if order_type == 'DOMESTIC' else None
+                        unit_price=unit_price if order_type == 'DOMESTIC' else None,
+                        price_yuan=item_price_yuan,
+                        price_baht=item_price_baht
                     )
                     count_items += 1
             
             # Trigger Proration (Only for Imported or mixed logic if needed)
-            if order_type == 'IMPORTED':
+            if order_type == 'IMPORTED' and yuan_mode == 'top-down':
                 po.prorate_costs()
-            else:
+            elif order_type == 'DOMESTIC':
                  # Domestic: Calculate costs from unit price
                  # We can use prorate_costs if modified, or do it here manually for safety initially, 
                  # BUT prorate_costs is called on save/signals too. 
@@ -1568,20 +1598,16 @@ def get_search_options(request):
     if sku_query:
         items = items.filter(Q(sku__product_code__icontains=sku_query) | Q(sku__name__icontains=sku_query))
         
-    # Limit results
-    items = items.select_related('header', 'sku')[:100]
-    
     # Extract unique PO numbers and SKUs for suggestions
-    pos = list(items.values_list('header__po_number', flat=True).distinct())
-    skus = []
-    for item in items:
-        val = f"{item.sku.product_code} | {item.sku.name}"
-        if val not in skus:
-            skus.append(val)
+    # We use distinct() before slicing to avoid the TypeError
+    pos = list(items.values_list('header__po_number', flat=True).distinct()[:50])
+    
+    skus_qs = items.values('sku__product_code', 'sku__name').distinct()[:50]
+    skus = [f"{s['sku__product_code']} | {s['sku__name']}" for s in skus_qs]
             
     return JsonResponse({
         'pos': pos,
-        'skus': skus[:50], # Limit SKU list
+        'skus': skus,
     })
 
 @login_required

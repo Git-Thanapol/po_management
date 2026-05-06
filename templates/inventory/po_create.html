@@ -208,6 +208,7 @@
 
       <!-- Hidden inputs needed for form logic -->
       <input type="hidden" name="total_items" id="total_items" value="0" />
+      <input type="hidden" name="yuan_mode" id="yuan_mode" value="top-down" />
     </form>
   </div>
 </div>
@@ -230,6 +231,8 @@
   function switchYuanMode() {
     yuanMode = (yuanMode === 'top-down') ? 'bottom-up' : 'top-down';
     const isBottomUp = yuanMode === 'bottom-up';
+
+    document.getElementById('yuan_mode').value = yuanMode;
 
     const btn = document.getElementById('yuanModeToggle');
     const totalYuanEl = document.getElementById('total_yuan');
@@ -291,7 +294,7 @@
                 <input type="text" id="view_unit_yuan_${rowCount}" class="form-control form-control-sm text-end border-0 bg-transparent" readonly value="0.00">
             </td>
             <td class="import-col">
-                <input type="number" step="0.01" id="view_total_yuan_${rowCount}"
+                <input type="number" step="0.01" id="view_total_yuan_${rowCount}" name="total_yuan_${rowCount}"
                   class="form-control form-control-sm text-end border-0 bg-transparent"
                   value="0.00" oninput="recalcFromLine(${rowCount})">
             </td>
