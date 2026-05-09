@@ -208,6 +208,8 @@ class POItem(models.Model):
     price_yuan = models.DecimalField(max_digits=12, decimal_places=4, default=0, verbose_name="Total Yuan (Prorated)")
     price_baht = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Total Baht")
     
+    carton_qty = models.IntegerField(null=True, blank=True, verbose_name="จำนวนลัง")
+
     # Receiving Stats
     total_received_qty = models.IntegerField(default=0, verbose_name="รับแล้ว (จำนวน)")
     total_received_cbm = models.DecimalField(max_digits=10, decimal_places=4, default=0, verbose_name="รับแล้ว (CBM)")

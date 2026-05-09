@@ -216,6 +216,7 @@
                             <th style="background-color: #6f42c1">จำนวนรับ</th>
                             <th style="background-color: #6f42c1">รับเข้าแล้ว</th>
                             <th style="background-color: #198754">สั่งซื้อ</th>
+                            <th style="background-color: #198754">จำนวนลัง</th>
                             <th class="bg-danger">สต็อกคงเหลือ</th>
                             <th class="bg-warning text-dark">รอเข้า</th>
                             <th style="background-color: #198754">ต้นทุน/ชิ้น (฿)</th>
@@ -311,6 +312,7 @@
                                 {{ item.total_received_qty }}
                             </td>
                             <td class="text-center fw-bold">{{ item.qty_ordered }}</td>
+                            <td class="text-center fw-bold">{{ item.carton_qty|default:"-" }}</td>
                             <td class="text-center fw-bold {% if item.sku.current_stock <= 0 %}text-danger{% elif item.sku.current_stock <= item.sku.min_limit %}text-warning{% else %}text-white{% endif %}">
                                 {{ item.sku.current_stock|intcomma }}
                             </td>
@@ -379,7 +381,8 @@
                 <th style="background-color: #6f42c1">รับแล้ว</th>
                 <!-- Ordered/Cost - Green -->
                 <th style="background-color: #198754">สั่งซื้อ</th>
-                
+                <th style="background-color: #198754">จำนวนลัง</th>
+
                 <!-- New Columns -->
                 <th class="bg-danger">สต็อกคงเหลือ</th>
                 <th class="bg-warning text-dark">รอเข้า</th>
@@ -532,6 +535,9 @@
 
                 <!-- 13. Ordered Qty -->
                 <td class="text-center fw-bold">{{ item.qty_ordered }}</td>
+
+                <!-- จำนวนลัง -->
+                <td class="text-center fw-bold">{{ item.carton_qty|default:"-" }}</td>
 
                 <!-- สต็อกคงเหลือ -->
                 <td class="text-center fw-bold {% if item.sku.current_stock <= 0 %}text-danger{% elif item.sku.current_stock <= item.sku.min_limit %}text-warning{% else %}text-white{% endif %}">

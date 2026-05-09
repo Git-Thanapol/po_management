@@ -149,6 +149,7 @@
                 <tr>
                   <th style="width: 200px">รหัสสินค้า (SKU)</th>
                   <th style="width: 80px">จำนวนสั่งซื้อ</th>
+                  <th style="width: 70px">จำนวนลัง</th>
 
                   <!-- Import Columns -->
                   <th class="import-col" style="width: 100px">ราคาต่อหน่วย (¥)</th>
@@ -180,6 +181,7 @@
                 <tr>
                   <td class="text-end">รวม:</td>
                   <td><span id="sumQty">0</span></td>
+                  <td></td>
 
                   <td class="import-col"></td>
                   <td class="import-col"><span id="sumYuan">0.00</span></td>
@@ -287,6 +289,9 @@
             </td>
             <td>
                 <input type="number" name="qty_${rowCount}" class="form-control form-control-sm text-center" min="1" value="1" oninput="recalcAll()">
+            </td>
+            <td>
+                <input type="number" name="carton_qty_${rowCount}" class="form-control form-control-sm text-center" min="1" placeholder="-">
             </td>
 
             <!-- Import Cols -->

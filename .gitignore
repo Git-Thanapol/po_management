@@ -9,8 +9,10 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 
-# Environment
+# Environment — never commit secrets
 .env
+.env_prod
+.env_*
 .venv
 env/
 venv/
@@ -26,6 +28,7 @@ staticfiles/
 # IDEs
 .vscode/
 .idea/
+*.ini
 
 # Windows
 Thumbs.db
@@ -38,12 +41,26 @@ $RECYCLE.BIN/
 *.msp
 *.lnk
 
-# Excel Temp Files
-~$*.xlsx
-~$*.xls
+# Excel / Binary design docs
+*.xlsx
+*.xls
+*.csv
 
 # Jupyter
 .ipynb_checkpoints/
 
 # Docker Data
 pgdata/
+
+# AI assistant context files (project-specific, not for shared repo)
+GEMINI.md
+
+# Sample data and mockup folders
+samples/
+new feature/
+
+# One-off utility scripts
+dump_schema.py
+fix_images.py
+test_logging_setup.py
+verify_po_updates.py

@@ -237,8 +237,9 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
             <th rowspan="3" class="bg-secondary bg-opacity-10" style="width: 100px">รูป</th>
             <th rowspan="3" class="bg-secondary bg-opacity-10">รหัสสินค้า / ชื่อสินค้า</th>
             <th rowspan="3" class="bg-secondary bg-opacity-10" style="width: 100px">จำนวนสั่ง</th>
+            <th rowspan="3" class="bg-secondary bg-opacity-10" style="width: 80px">จำนวนลัง</th>
 
-            
+
             <th rowspan="3" class="bg-secondary bg-opacity-10" style="width: 100px">ราคา/หน่วย</th>
             <th rowspan="3" class="bg-secondary bg-opacity-10" style="width: 100px">รวม (บาท)</th>
             {% comment %} {% if po.order_type == 'DOMESTIC' %}
@@ -331,6 +332,12 @@ po.po_number }} - รายละเอียด{% endblock %} {% block content 
             <td class="text-center bg-secondary bg-opacity-10">
               <div class="fw-bold">{{ item.qty_ordered }}</div>
               <div class="text-warning" style="font-size: 0.7rem;">Left: {{ item.remaining_qty }}</div>
+            </td>
+            <td class="text-center bg-secondary bg-opacity-10">
+              <input type="number" name="carton_qty_{{ item.id }}"
+                class="form-control form-control-sm bg-dark text-white border-secondary text-center px-1"
+                style="width: 60px; margin: auto;"
+                value="{{ item.carton_qty|default:'' }}" min="1" placeholder="-">
             </td>
             <td class="text-end bg-secondary bg-opacity-10">
               <div class="small">{{ item.unit_cost_thb|floatformat:2|intcomma }}</div>

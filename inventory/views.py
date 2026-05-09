@@ -490,14 +490,17 @@ def po_detail_view(request, po_id):
                         
                         item = POItem.objects.get(id=item_id, header=po)
                         item.qty_ordered = qty
-                        
+
+                        carton_val = request.POST.get(f'carton_qty_{item_id}')
+                        item.carton_qty = int(carton_val) if carton_val and carton_val.strip() else None
+
                         # Handle Manual Price Yuan if in bottom-up mode
                         if po.order_type == 'IMPORTED' and po.yuan_mode == 'bottom-up':
                             manual_yuan = request.POST.get(f'price_yuan_{item_id}')
                             if manual_yuan is not None:
                                 item.price_yuan = Decimal(manual_yuan or 0)
                                 item.price_baht = item.price_yuan * po.exchange_rate
-                        
+
                         item.save()
                         count_update += 1
                     except Exception as e:
@@ -1353,6 +1356,9 @@ def po_create_view(request):
                         item_price_yuan = get_decimal(f'total_yuan_{row_id}', 0)
                         item_price_baht = item_price_yuan * exchange_rate
                     
+                    carton_qty_val = request.POST.get(f'carton_qty_{row_id}')
+                    carton_qty = int(carton_qty_val) if carton_qty_val and carton_qty_val.strip() else None
+
                     # Create Item with Qty Only (Costs calc later or now for Domestic)
                     POItem.objects.create(
                         header=po,
@@ -1360,7 +1366,8 @@ def po_create_view(request):
                         qty_ordered=int(qty),
                         unit_price=unit_price if order_type == 'DOMESTIC' else None,
                         price_yuan=item_price_yuan,
-                        price_baht=item_price_baht
+                        price_baht=item_price_baht,
+                        carton_qty=carton_qty
                     )
                     count_items += 1
             
